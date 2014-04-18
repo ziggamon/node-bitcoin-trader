@@ -1,13 +1,10 @@
-// var Promise = require('Promise');
-// var request = require('request');
 var Promise = require('bluebird');
 var _  = require('lodash');
-var jf = require('jsonfile'); // shoud be gone
-var fx = require('money'); // should be gone
+// var jf = require('jsonfile'); // shoud be gone
+// var fx = require('money'); // should be gone
 
-_.extend(fx, jf.readFileSync('rates.json'));
+// _.extend(fx, jf.readFileSync('rates.json'));
 
-// console.log(fx(1).from('EUR').to('SEK') + ';');
 
 
 var EventEmitter = require("events").EventEmitter;
@@ -17,26 +14,38 @@ var RawSpreads = {
     'EUR' : [],
     'USD' : []
 };
-var FeeAdjustedSpreads = {};
 
+//var FeeAdjustedSpreads = {};
+
+/*
+    Gets spread for a given exchange and then stores it.
+*/
 trader.getSpread = function(exchangeName, currency){
     var self = this;
     return this.exchanges[exchangeName].getSpread(currency).then(function(data){
-        return storeAndProcessData(data, exchangeName)        
+        return storeSpread(data, exchangeName)        
     });
 }
 
-function storeAndProcessData(data, exchange){
+/*
+    Stores spread data.
+*/
+function storeSpread(data, exchange){
     data.exchange = exchange;
-    var adjustedData = adjust_to_fee(data, trader.exchanges[exchange].fee);
+
 
     // store data globally
     RawSpreads[exchange] = data;
-    FeeAdjustedSpreads[exchange] = adjustedData;
 
-    return adjustedData
+    // var adjustedData = adjust_to_fee(data, trader.exchanges[exchange].fee);
+    // FeeAdjustedSpreads[exchange] = adjustedData;
+
+    return data;
 }
 
+/*
+    Load all enabled exchanges
+*/
 trader.init = function(conf){
     conf = conf || require('./config.js');
 
@@ -55,7 +64,9 @@ trader.init = function(conf){
     return Promise.all(_.pluck(self.exchanges, 'initialized'));
 }
 
-
+/*
+Gets all spreads for given currency, or default 'EUR'
+*/
 trader.getAllSpreads = function(currency){
     var self = this;
     currency = currency || 'EUR';
@@ -71,6 +82,15 @@ trader.getAllSpreads = function(currency){
     return Promise.all(promises);
 }
 
+/*
+from array of [a, b, c] 
+returns array of arrays 
+[ 
+    [a,b], 
+    [a,c], 
+    [b,c] 
+]
+*/
 function getPairs(singles){
     var pairs = [];
     do {
@@ -83,6 +103,16 @@ function getPairs(singles){
     return pairs;
 }
 
+/*
+from array of [a, b, c] 
+returns array of arrays 
+[ 
+    [a,b], 
+    [b,a], 
+    [a,c] 
+    ... etc ... 
+]
+*/
 function getPairsInBothOrders(singles){
     var pairs = [];
     do {
@@ -96,6 +126,9 @@ function getPairsInBothOrders(singles){
     return pairs;
 }
 
+/*
+    Two functions to take into account fees.
+*/
 function buying_cost(amount, fee){
     return amount * (1 + fee);
 }
@@ -103,6 +136,10 @@ function selling_rev(amount, fee){
     return amount * (1 - fee);   
 }
 
+/*
+    Filter function that basically returns if two spreads have a profitable
+    arbitrage oportunity.   
+*/
 function arbitrage_possibilities(from, to){
     if(Array.isArray(from)){ // handle pairform as well
         to = from[1];
@@ -118,6 +155,10 @@ function arbitrage_possibilities(from, to){
     return(selling_rev(highest_bid, to.fee) > selling_rev(lowest_ask, from.fee) + 1.01); // add 1% requirement margin
 }
 
+/*
+    Compares a given spread data for an exchange with all other exchanges spread data
+    stored, returns array of which spreads an arbitrage oportunity exists between. 
+*/
 function detectArbitrageFor(spread){
     // var arbitragePossibilities = [];
     var spreadPairs = [];
@@ -144,6 +185,9 @@ function detectArbitrageFor(spread){
 
 }
 
+/*
+    Deprecated in favor of detectArbitrageFor(). 
+*/
 function detectArbitragePossibilities(spreads){
     var arbitragePossibilities = [];
     var spreadPairs = getPairsInBothOrders(spreads);
@@ -163,6 +207,10 @@ function detectArbitragePossibilities(spreads){
     return arbitragePossibilities;
 }
 
+/*
+    Either simulates or trades on two exchanges if arbitrage possibilities
+    arise. This is where things like fees and balances are taken into account.
+*/
 function processArbitrage(from, to){
     if(Array.isArray(from)){ // handle pairform as well
         to = from[1];
@@ -248,6 +296,11 @@ function processArbitrage(from, to){
 
 }
 
+/*
+    Default watch function to be used in exchange classes,
+    Basically keeps polling for spreads every second,
+    and emits 'spread_data' on trader when something new is received.
+*/
 function generalWatchFunction(currency, eventEmitter){
     var self = this;
     var rate = this.pollingRate || 1000;
@@ -256,7 +309,10 @@ function generalWatchFunction(currency, eventEmitter){
     }, rate);
 }
 
-
+/*
+  Deprecated. Find all arbitrage possibilities available at this moment.
+  Superceded by new structure with events, and to be removed soon.  
+*/
 trader.getArbitragePossibilities = function(currency){
     currency = currency || 'USD' ;
     trader.getAllSpreads(currency).then(function(results){
@@ -264,7 +320,9 @@ trader.getArbitragePossibilities = function(currency){
     });
 }
 
-
+/*
+    Return highest bid, lowest ask, spread in currency units, and percentage of the spread
+*/
 function extractBuySell(spread){
     return {
         ask : spread.asks[0][0],
@@ -273,7 +331,9 @@ function extractBuySell(spread){
         percent : ((spread.asks[0][0] - spread.bids[0][0]) * 100 / spread.asks[0][0] ).toFixed(2)
     };
 }
-
+/*
+    Get highest bid and lowest ask for each exchange
+*/
 trader.getBestBuy = function(currency){
     trader.getAllSpreads(currency).then(function(results){
         var outdata = {};
@@ -288,6 +348,11 @@ trader.getBestBuy = function(currency){
 
     });
 }
+
+/*
+    Poll or otherwise listen to updated market spread data for all exchanges
+    that deal in selected currency. 
+*/
 trader.watch = function(currency){
     var self = this;
     var exchangesToWatch = [];
@@ -302,24 +367,36 @@ trader.watch = function(currency){
     for (var i = exchangesToWatch.length - 1; i >= 0; i--) {
         exchangesToWatch[i].watch(currency, self);
     };
-    
-    trader.on('spread_data', function(spread){
-        // console.log('trader got spread data for', spread.exchange);
-        spread.fee = trader.exchanges[spread.exchange].fee;
-        if(_.isEqual(spread, RawSpreads[spread.currency][spread.exchange])){
-            // console.log('SPREADS ARE EQUAL!!');
-            return;
-        }
-        // console.log('different spreads. old: ', RawSpreads[spread.currency][spread.exchange], 'new: ', spread);
-        RawSpreads[spread.currency][spread.exchange] = spread;
-        trader.emit('updated_spread_data', spread);
-    });
-    trader.on('updated_spread_data', function(spread){
-        console.log('spread data is updated for ', spread.exchange.toUpperCase());
-        detectArbitrageFor(spread);
-    });
 };
 
+/*
+    When trader receives a new spread data for a given exchange
+*/
+
+function checkForSpreadUpdates(spread){
+    // console.log('trader got spread data for', spread.exchange);
+    spread.fee = trader.exchanges[spread.exchange].fee;
+    if(_.isEqual(spread, RawSpreads[spread.currency][spread.exchange])){
+        // console.log('SPREADS ARE EQUAL!!');
+        return;
+    }
+    // console.log('different spreads. old: ', RawSpreads[spread.currency][spread.exchange], 'new: ', spread);
+    RawSpreads[spread.currency][spread.exchange] = spread;
+    trader.emit('updated_spread_data', spread);
+}
+
+trader.on('spread_data', checkForSpreadUpdates);
+
+/*
+    When trader has received spread data that is different than what was previously stored.
+*/
+trader.on('updated_spread_data', detectArbitrageFor);
+
+/*
+    Deprecated. 
+    Calculate de facto costs of buying / selling in a spread,
+    with regard to current fees (as loaded from API or pre-set in config)
+*/
 function adjust_to_fee(spread, fee){
     var oldAsks = spread.asks;
     var oldBids = spread.bids;
