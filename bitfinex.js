@@ -28,13 +28,12 @@ module.exports = function(conf, trader){
             outdata.bids.push([bids[i].price, bids[i].amount]);
             outdata.asks.push([asks[i].price, asks[i].amount]);
         };
-
         return outdata;
     };
 
     this.getSpread = function(currency){ // only USD ATM.
-        return self.client.orderbook('btcusd').spread(function(response, body){
-            var data = self.spreadAdapter(JSON.parse(body));
+        return self.client.orderbook('btcusd').then(function(response){
+            var data = self.spreadAdapter(response);
             _.extend(data, {exchange: 'bitfinex', currency: currency});
             trader.emit('spread_data', data);
             return data;
@@ -42,23 +41,20 @@ module.exports = function(conf, trader){
     }
 
     this.getBalance = function(){
-        console.log('getting bitfinex balance');
 
         // keeping this function intact in case I forget how deferreds work ;) / SK. 21 mars
         var deferred = Promise.defer();
         
-        self.client.wallet_balances(function(error, result, body) {
+        self.client.wallet_balances(function(error, data) {
             if(error) {
                 console.error(error);
                 return deferred.reject(error);
             }
-            var data = JSON.parse(body);
 
             self.balance = {
                 'USD' : parseFloat(_.find(data, {type: 'exchange', currency :'usd'}).available),
                 'BTC' : parseFloat(_.find(data, {type: 'exchange', currency :'btc'}).available)
             };
-
             deferred.resolve(self.balance);
         });
 
