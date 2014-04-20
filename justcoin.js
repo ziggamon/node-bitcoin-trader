@@ -119,7 +119,7 @@ module.exports = function(conf, trader){
         })
     }
     this.getBalance().then(function(data){
-
+        console.log('justcoin balance: ', data);
         initDeferred.resolve();
         // id: 2361955
         // var options = {

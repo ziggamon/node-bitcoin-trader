@@ -55,6 +55,7 @@ module.exports = function(conf, trader){
                 'USD' : parseFloat(_.find(data, {type: 'exchange', currency :'usd'}).available),
                 'BTC' : parseFloat(_.find(data, {type: 'exchange', currency :'btc'}).available)
             };
+            console.log('bitfinex.balance: ', self.balance);
             deferred.resolve(self.balance);
         });
 

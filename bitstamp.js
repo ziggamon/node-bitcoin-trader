@@ -58,6 +58,7 @@ module.exports = function(conf, trader){
             self.fee = data.fee / 100 || self.fee;
             data = balanceMapper(data);
             self.balance = data;
+            console.log('bitstamp balance: ', data);
             return data;
         });
     }
