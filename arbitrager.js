@@ -244,8 +244,8 @@ function spitArbitrage(gtfo, theoretical){
     	} else {
     		arbitrades.push(highBid);
     		highBid = bids.shift();
-    		
-    		arbitrades.push(_.extend(_.cloneDeep(highBid), {amount: tradeAmount}));
+
+    		arbitrades.push(_.extend(_.cloneDeep(lowAsk), {amount: tradeAmount}));
     		lowAsk.amount -= tradeAmount;
     	}
     }
@@ -275,7 +275,7 @@ trader.init().then(function () {
 		addToEquivIndex(spread);
 		var possibleArbitrages = spitArbitrage(1, true);
 		if(possibleArbitrages.length > 0){
-			console.log('possible arbitrage: ', possibleArbitrages);
+			console.log('possible arbitrage: ', combineArbitrades(possibleArbitrages));
 		}
 	});
 
