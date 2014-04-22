@@ -70,12 +70,12 @@ var currentCurrency, currentExchange, currentFee, currencyMultiplier, feeMultipl
 
 function objectifySpreadItem(item){
 	return {
-		price : item[0],
-		amount : item[1],
+		price : parseFloat(item[0]),
+		amount : parseFloat(item[1]),
 		exchange : currentExchange,
 		currency : currentCurrency, 
-		equivPrice :  (item[0] * currencyMultiplier).toFixed(1), 
-		deFactoPrice : (item[0] * deFactoMultiplier).toFixed(1)
+		equivPrice :  parseFloat(item[0] * currencyMultiplier), 
+		deFactoPrice : parseFloat(item[0] * deFactoMultiplier)
 	};
 }
 
@@ -210,7 +210,7 @@ function spitArbitrage(gtfo, theoretical){
     var buyingAffordance, sellingAffordance, tradeAmount;
 
     console.log('best prices: 	buy ', 
-    	lowAsk.exchange, lowAsk.price, parseFloat(lowAsk.deFactoPrice).toFixed(2), lowAsk.amount, '	sell ', highBid.exchange, highBid.price, parseFloat(highBid.deFactoPrice).toFixed(2), highBid.amount);
+    	lowAsk.exchange, lowAsk.price.toFixed(2), lowAsk.deFactoPrice.toFixed(2), lowAsk.amount.toFixed(3), '	sell ', highBid.exchange, highBid.price.toFixed(2), highBid.deFactoPrice.toFixed(2), highBid.amount.toFixed(3));
 
     while ( lowAsk && highBid && lowAsk.deFactoPrice * gtfo < highBid.deFactoPrice ){
     	if( theoretical ) {
@@ -260,7 +260,7 @@ function combineArbitrades(arbitrades){
 
 	while(arbitrades.length > 0){
 		item = arbitrades.shift();
-		combinations = arbitrades.remove(_.pick(item, ['buySell', 'deFactoPrice', 'exchange', 'currency']));
+		combinations = _.remove( arbitrades, _.pick(item, ['buySell', 'deFactoPrice', 'exchange', 'currency']));
 		_.each(combinations, function(comboItem){
 			item.amount += comboItem.amount;
 		});
