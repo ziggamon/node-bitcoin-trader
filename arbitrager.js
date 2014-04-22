@@ -290,8 +290,8 @@ function detectArbitrageFor(spread){
 */
 function spitArbitrage(gtfo, theoretical){
 	var arbitrades = [];
-    var asks = combinedSpreads.asks; // no cloneDeep, I think...
-    var bids = combinedSpreads.bids;
+    var asks = _.cloneDeep(combinedSpreads.asks);
+    var bids = _.cloneDeep(combinedSpreads.bids);
 
     var lowAsk = asks.shift();
     var highBid = bids.shift();
@@ -300,7 +300,7 @@ function spitArbitrage(gtfo, theoretical){
 
     var buyingAffordance, sellingAffordance, tradeAmount;
 
-    console.log('theoretically best arbitrage: 	buy ', 
+    console.log('best prices: 	buy ', 
     	lowAsk.exchange, lowAsk.price, parseFloat(lowAsk.deFactoPrice).toFixed(2), lowAsk.amount, '	sell ', highBid.exchange, highBid.price, parseFloat(highBid.deFactoPrice).toFixed(2), highBid.amount);
 
     while ( lowAsk && highBid && lowAsk.deFactoPrice * gtfo < highBid.deFactoPrice ){
@@ -324,7 +324,7 @@ function spitArbitrage(gtfo, theoretical){
 		highBid.buySell = 'sell';
 
     	// we're in magic land now, buy and sell can happen and they're more than gtfo apart! Yey!
-    	tradeAmount = _.min(buyingAffordance, sellingAffordance);
+    	tradeAmount = _.min([buyingAffordance, sellingAffordance]);
 
     	console.log('searching for infinity: ', tradeAmount, buyingAffordance, sellingAffordance);
 
@@ -449,7 +449,9 @@ trader.init().then(function () {
 	trader.on('updated_spread_data', function(spread){
 		addToEquivIndex(spread);
 		var possibleArbitrages = spitArbitrage(1, true);
-		console.log('possible arbitrage: ', possibleArbitrages);
+		if(possibleArbitrages.length > 0){
+			console.log('possible arbitrage: ', possibleArbitrages);
+		}
 	});
 
 	ratesPromise.then(function(){
