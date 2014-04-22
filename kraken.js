@@ -116,13 +116,18 @@ module.exports = function(conf, trader){
         // funking depth
         var market = 'XXBTZ'+currency;
 
-
-        return self.client.promiseApi('Depth', {pair: market, count: 5}).then(function(data){
-            var data = data.result[market];
-            _.extend(data, {exchange: 'kraken', currency: currency});
-            trader.emit('spread_data', data);
-            return data;
-        });
+        try {
+            return self.client.promiseApi('Depth', {pair: market, count: 5}).then(function(data){
+                var data = data.result[market];
+                _.extend(data, {exchange: 'kraken', currency: currency});
+                trader.emit('spread_data', data);
+                return data;
+            }).catch(function(e){
+                console.log('kraken error: ', e);
+            });            
+        } catch(e){
+            deferred.reject(e);
+        }
 
         return deferred.promise;
     };
