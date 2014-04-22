@@ -25,6 +25,8 @@ trader.getSpread = function(exchangeName, currency){
     var self = this;
     return this.exchanges[exchangeName].getSpread(currency).then(function(data){
         return storeSpread(data, exchangeName)        
+    }).catch(function(e){
+        console.error('Error in getSpread', exchangeName, currency, e);
     });
 }
 
@@ -52,7 +54,7 @@ trader.init = function(conf){
 
     var self = this;
     self.exchanges = {};
-    _.forOwn(conf, function(exchangeConfig, exchangeName){
+    _.forOwn(conf.exchanges, function(exchangeConfig, exchangeName){
         if(!exchangeConfig.enabled){
             return;
         }
