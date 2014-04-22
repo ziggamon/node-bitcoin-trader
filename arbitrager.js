@@ -3,6 +3,8 @@ var _  = require('lodash');
 var jf = require('jsonfile');
 var fx = require('money');
 
+var fs = require('fs');
+
 var Promise = require('bluebird');
 var request = Promise.promisify(require('request'));
 var config = require('./config.js');
@@ -289,7 +291,7 @@ trader.init().then(function () {
 			}, 0);
 
 			console.log('Buy for ', totalBuys, ' sell for ', totalSells, ' profit: ', totalSells-totalBuys, ' percent: ', (100*(totalSells-totalBuys) / totalSells).toFixed(2), '%');
-
+			fs.appendFile('./log.txt', (new Date()).toTimeString() + ' Buy @ ' + buys[0].exchange + ' for ' + totalBuys + ' sell @ ' + combined[0].exchange +  ' for ' + totalSells + ' profit: ' + (totalSells-totalBuys) + ' percent: ' + (100*(totalSells-totalBuys) / totalSells).toFixed(2) + '% \n');
 		}
 	});
 
