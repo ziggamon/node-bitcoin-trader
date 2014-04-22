@@ -145,7 +145,7 @@ function objectifySpreadItem(item){
 	};
 }
 function addToEquivIndex(spread){
-	console.log('got spread data, ', spread.exchange, 'fee: ', spread.fee);
+	console.log('updated spread data 	', spread.exchange);
 
 	// clear out previous data for this exchange/currency combo, we'll add new ones now!
 	_.remove(combinedSpreads.asks, {exchange:spread.exchange, currency: spread.currency});
@@ -188,7 +188,7 @@ function initBalances(){
 }
 
 // much spaghetti in here... :/
-function affordedTradeAmount(buySell, neededAmount, nextTrade){
+function affordedTradeAmount(buySell, nextTrade, neededAmount){
 	initBalances();
 
 	var maxAffordedAmount;
@@ -204,8 +204,14 @@ function affordedTradeAmount(buySell, neededAmount, nextTrade){
 		throw "Something went wrong with calculating maxAffordedAmount" + JSON.stringify(nextTrade);
 	}
 
+	
+	var comparedAmounts = [maxAffordedAmount, nextTrade.amount];
+	if(neededAmount){ // sometimes I just want to get whatever
+		comparedAmounts.push(neededAmount);
+	}
+
 	// this is what will be returned
-	var actualTradeAmount = _.min([maxAffordedAmount, neededAmount, nextTrade.amount]);
+	var actualTradeAmount = _.min(comparedAmounts);
 
 	if(actualTradeAmount == 0) {
 		return 0;
@@ -221,13 +227,18 @@ function affordedTradeAmount(buySell, neededAmount, nextTrade){
 	return actualTradeAmount;
 }
 
+function theoreticalTradeAmount(nextTrade, neededAmount){
+	return _.min([nextTrade.amount, neededAmount]);
+}
+
+
 function bestTrade(buySell, neededAmount, theoretical){
 	var availableTrades = _.cloneDeep( (buySell.toLowerCase() === 'buy') ? combinedSpreads.asks : combinedSpreads.bids );
 	var tradeAmount, nextTrade;
 	var outputTrades = [], possibleAmounts = [];
 	while(neededAmount > 0 && (nextTrade = availableTrades.shift())){
 		// figure out how much I can trade
-		tradeAmount = theoretical ? theoreticalTradeAmount(neededAmount, nextTrade) : affordedTradeAmount(buySell, neededAmount, nextTrade);
+		tradeAmount = theoretical ? theoreticalTradeAmount(nextTrade, neededAmount) : affordedTradeAmount(buySell, nextTrade, neededAmount);
 
 		if(tradeAmount === 0){ // this trade can't be done, prolly broke on exchange
 			console.log('cannot afford to make trade on ', nextTrade.exchange)
@@ -277,6 +288,76 @@ function detectArbitrageFor(spread){
     Either simulates or trades on two exchanges if arbitrage possibilities
     arise. This is where things like fees and balances are taken into account.
 */
+function spitArbitrage(gtfo, theoretical){
+	var arbitrades = [];
+    var asks = combinedSpreads.asks; // no cloneDeep, I think...
+    var bids = combinedSpreads.bids;
+
+    var lowAsk = asks.shift();
+    var highBid = bids.shift();
+
+    gtfo = gtfo || 1;
+
+    var buyingAffordance, sellingAffordance, tradeAmount;
+
+    console.log('theoretically best arbitrage: 	buy ', 
+    	lowAsk.exchange, lowAsk.price, parseFloat(lowAsk.deFactoPrice).toFixed(2), lowAsk.amount, '	sell ', highBid.exchange, highBid.price, parseFloat(highBid.deFactoPrice).toFixed(2), highBid.amount);
+
+    while ( lowAsk && highBid && lowAsk.deFactoPrice * gtfo < highBid.deFactoPrice ){
+    	if( theoretical ) {
+    		buyingAffordance = lowAsk.amount;
+    		sellingAffordance = highBid.amount;
+    	} else {
+	    	// getting a realistic buy and sell
+	    	buyingAffordance = affordedTradeAmount('buy', lowAsk);
+	    	if( buyingAffordance == 0 ){
+	    		lowAsk = asks.shift();
+	    		continue;
+	    	}
+	    	sellingAffordance = affordedTradeAmount('sell', highBid);
+	    	if( sellingAffordance == 0 ){
+	    		highBid = bids.shift();
+	    		continue;
+	    	}
+    	}
+		lowAsk.buySell = 'buy';
+		highBid.buySell = 'sell';
+
+    	// we're in magic land now, buy and sell can happen and they're more than gtfo apart! Yey!
+    	tradeAmount = _.min(buyingAffordance, sellingAffordance);
+
+    	console.log('searching for infinity: ', tradeAmount, buyingAffordance, sellingAffordance);
+
+    	if(tradeAmount === buyingAffordance){
+    		arbitrades.push(lowAsk);
+    		highBid.amount -= tradeAmount;
+    		arbitrades.push(highBid);
+    		lowAsk = asks.shift();
+    	} else {
+    		arbitrades.push(highBid);
+    		lowAsk.amount -= tradeAmount;
+    		arbitrades.push(lowAsk);
+    		highBid = bids.shift();
+    	}
+    }
+    return arbitrades;
+}
+
+function combineArbitrades(arbitrades){
+	// compress arbitrades so multiple on same exchange with same price get combined.
+	var processedArbitrades = [], combinations = [];
+
+	while(arbitrades.length > 0){
+		item = arbitrades.shift();
+		combinations = arbitrades.remove(_.pick(item, ['buySell', 'deFactoPrice', 'exchange', 'currency']));
+		_.each(combinations, function(comboItem){
+			item.amount += comboItem.amount;
+		});
+		processedArbitrades.push(item);
+	}
+    return processedArbitrades;
+}
+
 function processArbitrage(from, to){
     if(Array.isArray(from)){ // handle pairform as well
         to = from[1];
@@ -362,45 +443,28 @@ function processArbitrage(from, to){
 }
 
 
+
+
 trader.init().then(function () {
-	trader.on('updated_spread_data', addToEquivIndex);
+	trader.on('updated_spread_data', function(spread){
+		addToEquivIndex(spread);
+		var possibleArbitrages = spitArbitrage(1, true);
+		console.log('possible arbitrage: ', possibleArbitrages);
+	});
 
 	ratesPromise.then(function(){
+	    trader.watch('EUR');
+	    trader.watch('USD');
 
-	    console.log('inited trader!');
-	    // console.log();
+	 //    console.log('inited trader!');
+	 //    // console.log();
 
-		Promise.all(_.map(_.keys(trader.RawSpreads), trader.getAllSpreads, trader)).then(function(){
-			console.log('got all spreads')
+		// Promise.all(_.map(_.keys(trader.RawSpreads), trader.getAllSpreads, trader)).then(function(){
+		// 	console.log('got all spreads')
 
-			console.log(bestTrade('sell', 20));
+		// 	console.log(bestTrade('sell', 20));
 
-		});
-		
-		    // When trader has received spread data that is different than what was previously stored.
-		
+		// });
 
-		/*
-		    Get highest bid and lowest ask for each exchange
-		*/
-		// getBestBuy = function(currency){
-
-		//     trader.getAllSpreads(currency).then(function(results){
-		//         var outdata = {};
-		//         results.forEach(function(result){
-		//             var buySell = trader.extractBuySell(result);
-		//             buySell.bid = buySell.bid + ' | ' + fx(buySell.bid).from(currency).to('SEK').toFixed(0);
-		//             buySell.ask = buySell.ask + ' | ' + fx(buySell.ask).from(currency).to('SEK').toFixed(0);
-		//             outdata[result.exchange] = buySell;
-		//         });
-
-		//         console.log(currency, outdata); 
-
-		//     });
-		// }
-
-
-	    // trader.watch('EUR');
-	    // trader.watch('USD');
 	});
 });
