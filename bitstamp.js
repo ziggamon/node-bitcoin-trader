@@ -36,6 +36,9 @@ module.exports = function(conf, trader){
     };
 
     function balanceMapper(data){
+        if(_.isNaN(data.btc_available) || _.isNaN(data.usd_available)){
+            throw new Error('Data received for Bitstamp balance is NaN');
+        }
         return {
             'BTC' : parseFloat(data.btc_available),
             'USD' : parseFloat(data.usd_available)

@@ -56,6 +56,9 @@ module.exports = function(conf, trader){
                 'BTC' : parseFloat(_.find(data, {type: 'exchange', currency :'btc'}).available)
             };
             console.log('bitfinex.balance: ', self.balance);
+            if(_.isNaN(self.balance.USD) || _.isNaN(self.balance.BTC)){
+                deferred.reject('Bitfinex balance isNaN');
+            }
             deferred.resolve(self.balance);
         });
 
