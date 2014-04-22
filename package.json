@@ -18,6 +18,7 @@
     "microtime": "~0.5.1",
     "jsonfile": "~1.1.1",
     "bitfinex": "git://github.com/naddison36/bitfinex.git",
-    "request": "~2.34.0"
+    "request": "~2.34.0",
+    "pusher-client": "~0.2.1"
   }
 }
