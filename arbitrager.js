@@ -275,7 +275,21 @@ trader.init().then(function () {
 		addToEquivIndex(spread);
 		var possibleArbitrages = spitArbitrage(1, true);
 		if(possibleArbitrages.length > 0){
-			console.log('possible arbitrage: ', combineArbitrades(possibleArbitrages));
+			var combined = combineArbitrades(possibleArbitrages);
+
+			console.log('possible arbitrage: ', combined);
+
+			var buys = _.remove(combined, {buySell:'buy'})
+			var totalBuys = _.reduce(buys, function(sum, item){
+				return sum + (item.deFactoPrice * item.amount)
+			}, 0);
+
+			var totalSells = _.reduce(combined, function(sum, item){
+				return sum + (item.deFactoPrice * item.amount)
+			}, 0);
+
+			console.log('Buy for ', totalBuys, ' sell for ', totalSells, ' profit: ', totalSells-totalBuys, ' percent: ', (100*(totalSells-totalBuys) / totalSells).toFixed(2), '%');
+
 		}
 	});
 
