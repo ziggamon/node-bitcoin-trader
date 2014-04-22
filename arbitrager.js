@@ -235,18 +235,18 @@ function spitArbitrage(gtfo, theoretical){
     	// we're in magic land now, buy and sell can happen and they're more than gtfo apart! Yey!
     	tradeAmount = _.min([buyingAffordance, sellingAffordance]);
 
-    	console.log('searching for infinity: ', tradeAmount, buyingAffordance, sellingAffordance);
-
     	if(tradeAmount === buyingAffordance){
     		arbitrades.push(lowAsk);
-    		highBid.amount -= tradeAmount;
-    		arbitrades.push(highBid);
     		lowAsk = asks.shift();
+
+    		arbitrades.push(_.extend(_.cloneDeep(highBid), {amount: tradeAmount}));
+    		highBid.amount -= tradeAmount;
     	} else {
     		arbitrades.push(highBid);
-    		lowAsk.amount -= tradeAmount;
-    		arbitrades.push(lowAsk);
     		highBid = bids.shift();
+    		
+    		arbitrades.push(_.extend(_.cloneDeep(highBid), {amount: tradeAmount}));
+    		lowAsk.amount -= tradeAmount;
     	}
     }
     return arbitrades;
