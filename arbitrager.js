@@ -34,6 +34,8 @@ var combinedSpreads = {
 	asks : []
 };
 
+var bestBid, bestAsk;
+
 /**
 * The merge part of the merge sort algorithm.
 *
@@ -104,10 +106,21 @@ function addToEquivIndex(spread){
 
 	combinedSpreads.asks = _.first(merge(equivComparatorAsc, combinedSpreads.asks, _.map(spread.asks, objectifySpreadItem)), 20);
 
+
 	// for selling
 	feeMultiplier = selling_rev(1, currentFee);
 	deFactoMultiplier = feeMultiplier * currencyMultiplier;
 	combinedSpreads.bids = _.first(merge(equivComparatorDesc, combinedSpreads.bids, _.map(spread.bids, objectifySpreadItem)), 20);
+
+	if( !_.isEqual(bestAsk, combinedSpreads.asks[0]) ){
+		console.log('emitting updated best ask!')
+		bestAsk = _.cloneDeep(combinedSpreads.asks[0]);
+		trader.emit('updated_best_trade');
+	} else if( !_.isEqual(bestBid, combinedSpreads.bids[0]) ){
+		console.log('emitting updated best bid');
+		bestBid = _.cloneDeep(combinedSpreads.bids[0]);
+		trader.emit('updated_best_trade');
+	}
 
 	// console.log('merged asks: ', combinedSpreads.asks);
 	// console.log('merged bids: ', combinedSpreads.bids);
@@ -273,9 +286,10 @@ function combineArbitrades(arbitrades){
 
 
 trader.init().then(function () {
-	trader.on('updated_spread_data', function(spread){
-		addToEquivIndex(spread);
-		var possibleArbitrages = spitArbitrage(1, true);
+	trader.on('updated_spread_data', addToEquivIndex);
+
+	trader.on('updated_best_trade', function(){
+		var possibleArbitrages = spitArbitrage(1.005, true);
 		if(possibleArbitrages.length > 0){
 			var combined = combineArbitrades(possibleArbitrages);
 
@@ -290,21 +304,15 @@ trader.init().then(function () {
 				return sum + (item.deFactoPrice * item.amount)
 			}, 0);
 
-			console.log('Buy for ', totalBuys, ' sell for ', totalSells, ' profit: ', totalSells-totalBuys, ' percent: ', (100*(totalSells-totalBuys) / totalSells).toFixed(2), '%');
-			fs.appendFile('./log.txt', (new Date()).toTimeString() + ' Buy @ ' + buys[0].exchange + ' for ' + totalBuys + ' sell @ ' + combined[0].exchange +  ' for ' + totalSells + ' profit: ' + (totalSells-totalBuys) + ' percent: ' + (100*(totalSells-totalBuys) / totalSells).toFixed(2) + '% \n');
+			console.log('Buy for ', totalBuys.toFixed(2), ' sell for ', totalSells.toFixed(2), ' profit: ', (totalSells-totalBuys).toFixed(2), ' percent: ', (100*(totalSells-totalBuys) / totalSells).toFixed(2), '%');
+			fs.appendFile('./log.txt', (new Date()).toTimeString() + ' Buy @ ' + buys[0].exchange + ' for ' + totalBuys.toFixed(2) + ' sell @ ' + combined[0].exchange +  ' for ' + totalSells.toFixed(2) + ' profit: ' + (totalSells-totalBuys).toFixed(2) + ' percent: ' + (100*(totalSells-totalBuys) / totalSells).toFixed(2) + '% \n');
 		}
+
 	});
 
 	ratesPromise.then(function(){
 	    trader.watch('EUR');
 	    trader.watch('USD');
-
-		// Promise.all(_.map(_.keys(trader.RawSpreads), trader.getAllSpreads, trader)).then(function(){
-		// 	console.log('got all spreads')
-
-		// 	console.log(bestTrade('sell', 20));
-
-		// });
 
 	});
 });
