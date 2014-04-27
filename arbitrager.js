@@ -11,9 +11,15 @@ var config = require('./config.js');
 
 var baseCurrency = 'USD';
 
-var ratesPromise = request('http://openexchangerates.org/api/latest.json?app_id=' + config.rates.app_id, {json:true}).spread(function(request, data){
-	_.extend(fx, data);
-});
+function getRates(){
+	return request('http://openexchangerates.org/api/latest.json?app_id=' + config.rates.app_id, {json:true}).spread(function(request, data){
+		_.extend(fx, data);
+	});
+}
+setInterval(getRates, 30*60*1000);
+
+// for the init procedures, get rates right away!
+var ratesPromise = getRates();
 
 
 var trader = require('./trader.js');
