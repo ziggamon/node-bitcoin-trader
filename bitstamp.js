@@ -56,18 +56,20 @@ module.exports = function(conf, trader){
     this.getBalance = function(){
         return self.client.balance().then(function(data) {
             self.fee = data.fee / 100 || self.fee;
-            data = balanceMapper(data);
-            self.balance = data;
+            self.balance = balanceMapper(data);
             if(_.isNaN(self.balance.USD) || _.isNaN(self.balance.BTC)){
+                console.log('error in bitstamp balance; ', data);
                 throw new Error('Data received for Bitstamp balance is NaN');
             }
-
-            console.log('bitstamp balance: ', data);
             return data;
         });
     }
     this.getBalance().then(function(){
         initDeferred.resolve();
+    }).catch(Error, function(e){
+        initDeferred.reject(e);
+    }).error(function(e){
+        initDeferred.reject(e);
     });
 
 }
