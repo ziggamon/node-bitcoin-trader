@@ -110,26 +110,22 @@ module.exports = function(conf, trader){
 
     this.getSpread = function(currency){
         currency = currency || 'EUR';
-
-        // var deferred = Promise.defer();
         
         // funking depth
         var market = 'XXBTZ'+currency;
 
-        try {
-            return self.client.promiseApi('Depth', {pair: market, count: 5}).then(function(data){
-                var data = data.result[market];
-                _.extend(data, {exchange: 'kraken', currency: currency});
-                trader.emit('spread_data', data);
-                return data;
-            }).catch(function(e){
-                console.log('kraken error: ', e);
-            });            
-        } catch(e){
-            deferred.reject(e);
-        }
-
-        return deferred.promise;
+        return self.client.promiseApi('Depth', {pair: market, count: 5}).then(function(data){
+            var data = data.result[market];
+            _.extend(data, {exchange: 'kraken', currency: currency});
+            trader.emit('spread_data', data);
+            return data;
+        }).catch(Error, function(e){
+            console.error('kraken error .catch() ');
+        }).error(function(e){
+            console.error('kraken error .error() ');
+        }).catch(function(e){
+            console.error('kraken general purpose catch()');
+        });
     };
 
     var balanceMapper = function(data){
