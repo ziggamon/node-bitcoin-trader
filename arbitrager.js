@@ -25,14 +25,26 @@ var ratesPromise = getRates();
 var trader = require('./trader.js');
 
 
+function getFee(param){
+	if(_.isNumber(param)){
+		return param;
+	}
+	if(_.isString(param)){
+		return trader.exchanges[param].fee;
+	}
+	if(_.isObject(param) && param.exchange){
+		return trader.exchanges[param.exchange].fee;
+	}
+	throw new Error('Unknown param to getFee: ', param);
+}
 /*
     Two functions to take into account fees.
 */
-function buying_cost(amount, fee){
-    return amount * (1 + fee);
+function buying_cost(amount, feeParam){
+    return amount * (1 + getFee(feeParam));
 }
-function selling_rev(amount, fee){
-    return amount * (1 - fee);   
+function selling_rev(amount, feeParam){
+    return amount * (1 - getFee(feeParam));   
 }
 
 var combinedSpreads = {
@@ -77,6 +89,7 @@ function equivComparatorDesc(a, b){
 
 var currentCurrency, currentExchange, currentFee, currencyMultiplier, feeMultiplier, deFactoMultiplier;
 
+var lastReceivedExchange;
 
 function objectifySpreadItem(item){
 	return {
@@ -93,6 +106,7 @@ function objectifySpreadItem(item){
 	Maintains a sorted of best trades available in the system
 */
 function addToEquivIndex(spread){
+	lastReceivedExchange = spread.exchange;
 	console.log('updated spread data 	', spread.exchange);
 
 	// clear out previous data for this exchange/currency combo, we'll add new ones now!
@@ -103,20 +117,21 @@ function addToEquivIndex(spread){
 	// weird workaround, should probably just pass it in as an object...
 	currentCurrency = spread.currency;
 	currentExchange = spread.exchange;
-	currentFee = spread.fee;
+
 	currencyMultiplier = fx(1).from(currentCurrency).to(baseCurrency)
 
 	// for buying
-	feeMultiplier = buying_cost(1, currentFee);
+	feeMultiplier = buying_cost(1, spread);
 	deFactoMultiplier = feeMultiplier * currencyMultiplier;
 
 	combinedSpreads.asks = _.first(merge(equivComparatorAsc, combinedSpreads.asks, _.map(spread.asks, objectifySpreadItem)), 20);
 
-
 	// for selling
-	feeMultiplier = selling_rev(1, currentFee);
+	feeMultiplier = selling_rev(1, spread);
 	deFactoMultiplier = feeMultiplier * currencyMultiplier;
 	combinedSpreads.bids = _.first(merge(equivComparatorDesc, combinedSpreads.bids, _.map(spread.bids, objectifySpreadItem)), 20);
+
+
 
 	if( !_.isEqual(bestAsk, combinedSpreads.asks[0]) ){
 		console.log('emitting updated best ask!')
@@ -139,22 +154,23 @@ function initBalances(){
 	if(balances){
 		return;
 	}
-	balances = {};
-
+	balances = getBalances();
+}
+function getBalances(){
+	var balances = {};
 	_.each(trader.exchanges, function(exchange, name){
 		balances[name] = _.cloneDeep(exchange.balance);
 	});
+	return balances;
 }
 
 // much spaghetti in here... :/
 function affordedTradeAmount(buySell, nextTrade, neededAmount){
-	initBalances();
 
 	var maxAffordedAmount;
 	// TODO: only taking fees in account when buying, not when selling (fees normally charged in fiat). Is that right?
 	if(buySell.toLowerCase() === 'buy'){
-		var fee = trader.exchanges[nextTrade.exchange].fee;
-		maxAffordedAmount = balances[nextTrade.exchange][nextTrade.currency] / buying_cost(nextTrade.price,fee);
+		maxAffordedAmount = balances[nextTrade.exchange][nextTrade.currency] / buying_cost(nextTrade.price,nextTrade);
 	} else { // sell
 		maxAffordedAmount = balances[nextTrade.exchange]['BTC'];
 	}
@@ -163,27 +179,12 @@ function affordedTradeAmount(buySell, nextTrade, neededAmount){
 		throw "Something went wrong with calculating maxAffordedAmount" + JSON.stringify(nextTrade);
 	}
 
-	
 	var comparedAmounts = [maxAffordedAmount, nextTrade.amount];
 	if(neededAmount){ // sometimes I just want to get whatever
 		comparedAmounts.push(neededAmount);
 	}
 
-	// this is what will be returned
-	var actualTradeAmount = _.min(comparedAmounts);
-
-	if(actualTradeAmount == 0) {
-		return 0;
-	}
-
-	// update balances object.
-	if(buySell.toLowerCase() === 'buy'){
-		balances[nextTrade.exchange][nextTrade.currency] -= actualTradeAmount * buying_cost(nextTrade.price,fee);
-	} else {
-		balances[nextTrade.exchange]['BTC'] -= actualTradeAmount;
-	}
-
-	return actualTradeAmount;
+	return _.min(comparedAmounts);
 }
 
 function theoreticalTradeAmount(nextTrade, neededAmount){
@@ -195,9 +196,12 @@ function theoreticalTradeAmount(nextTrade, neededAmount){
 	Either practically (takes into account balances) or theoretically.
 */
 function bestTrade(buySell, neededAmount, theoretical){
+	throw new Error('bestTrade is currently now working')
 	var availableTrades = _.cloneDeep( (buySell.toLowerCase() === 'buy') ? combinedSpreads.asks : combinedSpreads.bids );
 	var tradeAmount, nextTrade;
 	var outputTrades = [], possibleAmounts = [];
+	initBalances();
+
 	while(neededAmount > 0 && (nextTrade = availableTrades.shift())){
 		// figure out how much I can trade
 		tradeAmount = theoretical ? theoreticalTradeAmount(nextTrade, neededAmount) : affordedTradeAmount(buySell, nextTrade, neededAmount);
@@ -222,6 +226,7 @@ function spitArbitrage(gtfo, theoretical){
 	var arbitrades = [];
     var asks = _.cloneDeep(combinedSpreads.asks);
     var bids = _.cloneDeep(combinedSpreads.bids);
+	balances = getBalances();
 
     var lowAsk = asks.shift();
     var highBid = bids.shift();
@@ -234,41 +239,40 @@ function spitArbitrage(gtfo, theoretical){
     	lowAsk.exchange, lowAsk.price.toFixed(2), lowAsk.deFactoPrice.toFixed(2), lowAsk.amount.toFixed(3), '	sell ', highBid.exchange, highBid.price.toFixed(2), highBid.deFactoPrice.toFixed(2), highBid.amount.toFixed(3));
 
     while ( lowAsk && highBid && lowAsk.deFactoPrice * gtfo < highBid.deFactoPrice ){
+		lowAsk.buySell = 'buy';
+		highBid.buySell = 'sell';
+
     	if( theoretical ) {
     		buyingAffordance = lowAsk.amount;
     		sellingAffordance = highBid.amount;
     	} else {
 	    	// getting a realistic buy and sell
 	    	buyingAffordance = affordedTradeAmount('buy', lowAsk);
-	    	if( buyingAffordance == 0 ){
-	    		lowAsk = asks.shift();
-	    		continue;
-	    	}
 	    	sellingAffordance = affordedTradeAmount('sell', highBid);
-	    	if( sellingAffordance == 0 ){
-	    		highBid = bids.shift();
-	    		continue;
-	    	}
-    	}
-		lowAsk.buySell = 'buy';
-		highBid.buySell = 'sell';
 
+    	}
+    	if( buyingAffordance <= 0 ){
+    		lowAsk = asks.shift();
+    		continue;
+    	}
+    	if( sellingAffordance <= 0 ){
+    		highBid = bids.shift();
+    		continue;
+    	}
     	// we're in magic land now, buy and sell can happen and they're more than gtfo apart! Yey!
+
+    	// this needs to deal with affordances better!!
     	tradeAmount = _.min([buyingAffordance, sellingAffordance]);
 
-    	if(tradeAmount === buyingAffordance){
-    		arbitrades.push(lowAsk);
-    		lowAsk = asks.shift();
+		arbitrades.push(_.extend(_.cloneDeep(highBid), {amount: tradeAmount}));
+		highBid.amount -= tradeAmount;
 
-    		arbitrades.push(_.extend(_.cloneDeep(highBid), {amount: tradeAmount}));
-    		highBid.amount -= tradeAmount;
-    	} else {
-    		arbitrades.push(highBid);
-    		highBid = bids.shift();
+		arbitrades.push(_.extend(_.cloneDeep(lowAsk), {amount: tradeAmount}));
+		lowAsk.amount -= tradeAmount;
 
-    		arbitrades.push(_.extend(_.cloneDeep(lowAsk), {amount: tradeAmount}));
-    		lowAsk.amount -= tradeAmount;
-    	}
+		balances[lowAsk.exchange][lowAsk.currency] -= ( tradeAmount * buying_cost(lowAsk.price,lowAsk) );
+		balances[highBid.exchange]['BTC'] -= tradeAmount;
+
     }
     return arbitrades;
 }
@@ -277,26 +281,44 @@ function spitArbitrage(gtfo, theoretical){
 	Compress arbitrades so multiple on same exchange with same price get combined.
 */
 function combineArbitrades(arbitrades){
+	console.log('precombines arbitrades: ', arbitrades);
 	var processedArbitrades = [], combinations = [];
 
-	while(arbitrades.length > 0){
-		item = arbitrades.shift();
+	// first, find the item that came from the lastReceivedExchange. 
+	var item = _.find(arbitrades, {exchange : lastReceivedExchange});
+	if(!item){
+		throw new Error('Shouldnt happen; Couldnt find an item from the last received exchange: ', lastReceivedExchange);
+	}
+	_.remove(arbitrades,item);
+
+	// do this until break
+	do{
+		// filters out each trade that has the exact same buySell, deFactoPrice, exchange and currency.
 		combinations = _.remove( arbitrades, _.pick(item, ['buySell', 'deFactoPrice', 'exchange', 'currency']));
 		_.each(combinations, function(comboItem){
 			item.amount += comboItem.amount;
 		});
 		processedArbitrades.push(item);
-	}
+
+		// stop if we're empty
+		if(arbitrades.length == 0){ break;}
+
+	} while(item = arbitrades.shift());
     return processedArbitrades;
 }
 
+
+function performArbitrage(trades){
+	console.log(trades);
+}
 
 trader.init().then(function () {
 	trader.on('updated_spread_data', addToEquivIndex);
 
 	trader.on('updated_best_trade', function(){
-		var possibleArbitrages = spitArbitrage(1.005, true);
+		var possibleArbitrages = spitArbitrage(1, false);
 		if(possibleArbitrages.length > 0){
+			console.log('POSSIBLE!');
 			var combined = combineArbitrades(possibleArbitrages);
 
 			console.log('possible arbitrage: ', combined);

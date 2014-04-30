@@ -111,6 +111,14 @@ trader.extractBuySell = function(spread){
 }
 
 /*
+    Wrapper command to send trades.
+*/
+trader.trade = function(options){
+    options.volume = options.volume || options.amount; // handle both types of indata, both volume and amount    
+
+    return trader.exchanges[options.exchange].trade(options);
+}
+/*
     Poll or otherwise listen to updated market spread data for all exchanges
     that deal in selected currency. 
 */
