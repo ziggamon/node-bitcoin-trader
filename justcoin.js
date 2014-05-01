@@ -21,7 +21,7 @@ module.exports = function(conf, trader){
             requestOptions.method = method;
         }
         if(options){
-            requestOptions.form = options;
+            requestOptions.body = options;
         }
 
         return request(this._url(path), requestOptions).spread(function(request, data){
@@ -57,8 +57,8 @@ module.exports = function(conf, trader){
         return this._doRequest('orders', 'POST', {
             market : 'BTC'+options.currency,
             type : typeMapper[options.buySell],
-            amount : options.volume,
-            price : options.price         
+            amount : options.volume.toString(),
+            price : options.price.toString()
         });
     };
 
