@@ -110,14 +110,39 @@ trader.extractBuySell = function(spread){
     };
 }
 
+function logifyTrade(tradeOptions){
+    tradeOptions.datetime = (new Date()).toString();
+    return _.template('${ datetime }: ${ buySell } @ ${ exchange }, ${ volume } at ${ price }', tradeOptions);
+}
+
 /*
     Wrapper command to send trades.
 */
 trader.trade = function(options){
     options.volume = options.volume || options.amount; // handle both types of indata, both volume and amount    
-
-    return trader.exchanges[options.exchange].trade(options);
+    fs.appendFile('./opened_trades.txt', logifyTrade(options));
+    return trader.exchanges[options.exchange].trade(options).then(function(){
+        console.log('trade closed! ', logifyTrade(options))
+        fs.appendFile('./closed_trades.txt', logifyTrade(options));
+    }).error(function(error){
+        console.log('trade aborted: ', error);
+        fs.appendFile('./closed_trades.txt', '-- ' +error + " " + logifyTrade(options));
+    }).catch(function(error){
+        console.log('error in trade: ', error);
+        fs.appendFile('./closed_trades.txt', '!! ' +error + " " + logifyTrade(options));
+    });
 }
+
+/*
+    Update all balances
+*/
+
+trader.getBalances = function(){
+    return Promise.map(_.values(trader.exchanges), function(exchange){
+        return exchange.getBalance();
+    });
+}
+
 /*
     Poll or otherwise listen to updated market spread data for all exchanges
     that deal in selected currency. 

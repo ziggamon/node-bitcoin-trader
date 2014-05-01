@@ -307,21 +307,28 @@ function combineArbitrades(arbitrades){
     return processedArbitrades;
 }
 
+function performArbitrageTrades(trades){
+	var firstCriticalTrade = trades.shift();
 
-function performArbitrage(trades){
-	console.log(trades);
+	trader.trade(firstCriticalTrade).then(function(){
+		return Promise.map(trades, trader.trade); // do the other trades
+	}).then(function(){
+		console.log('trades done!');
+		return trader.getBalances();
+	}).then(function(){
+		console.log('Got new balances: ', getBalances());
+	}).done();
 }
 
 trader.init().then(function () {
 	trader.on('updated_spread_data', addToEquivIndex);
 
 	trader.on('updated_best_trade', function(){
-		var possibleArbitrages = spitArbitrage(1, false);
+		var possibleArbitrages = spitArbitrage(1.005, false);
 		if(possibleArbitrages.length > 0){
-			console.log('POSSIBLE!');
 			var combined = combineArbitrades(possibleArbitrages);
 
-			console.log('possible arbitrage: ', combined);
+			performArbitrageTrades(combined);
 
 			var buys = _.remove(combined, {buySell:'buy'})
 			var totalBuys = _.reduce(buys, function(sum, item){
@@ -341,6 +348,5 @@ trader.init().then(function () {
 	ratesPromise.then(function(){
 	    trader.watch('EUR');
 	    trader.watch('USD');
-
 	});
 });
