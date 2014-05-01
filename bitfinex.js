@@ -11,7 +11,7 @@ module.exports = function(conf, trader){
     this.initialized = initDeferred.promise;
 
     this.client = new Client(this.key, this.secret);
-    ['orderbook'/*, 'wallet_balances'*/].forEach(function(command){
+    ['orderbook', 'new_order', 'order_status' /*, 'wallet_balances'*/].forEach(function(command){
         self.client[command] = Promise.promisify(self.client[command]);
     })
     this.spreadAdapter = function(indata){
@@ -64,6 +64,55 @@ module.exports = function(conf, trader){
 
         return deferred.promise;
     }
+    this.tradeCommand = function(options){
+        console.log('executing bitfinex trade: ', options);
+
+        return this.client.new_order('btcusd', options.volume, options.price, 'all', options.buySell.toLowerCase(), 'limit').then(function(response){
+            console.log('add order sent: ', response);
+            return response;
+        });
+    }
+    this.trade = function(options){
+        var tradeResolver = Promise.defer();
+
+        var neededOptions = ['currency', 'buySell', 'price', 'volume'];
+        for (var i = neededOptions.length - 1; i >= 0; i--) {
+            if(!_.has(options, neededOptions[i])){
+                return tradeResolver.throw('Input data error').promise;
+            }
+        };
+
+        this.tradeCommand(options).then(function(response){
+            var id = response.order_id;
+            var i = 0;
+
+            console.log('bitfinex order id: ', id);
+
+            function tradeChecker(response){
+                if(tradeResolver.promise.isResolved()){ return ; } // quit the loop 
+
+                if(response.remaining_amount == 0){
+                    console.log('order is completed!');
+                    tradeResolver.resolve(response);
+                    return true;
+                } else if (response.is_cancelled){
+                    console.log('order is cancelled!');
+                    tradeResolver.reject(response);
+                    return false;
+                } else if(response.is_live){
+                    console.log('order ', id, 'is still running, iteration', i++);
+                    Promise.delay(1000).then(function(){
+                        return self.client.order_status(id); // here is where the request happens
+                    }).then(tradeChecker); // keep looping this baby                    
+                } else {
+                    throw new Error('Unclear bitfinex trade situation: ', response);
+                }
+            }
+            tradeChecker(response); // verify original response
+        });
+
+        return tradeResolver.promise;
+    };
     
     this.getBalance().then(function(){
         initDeferred.resolve();    
