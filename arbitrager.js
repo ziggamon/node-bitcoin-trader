@@ -37,6 +37,27 @@ function getFee(param){
 	}
 	throw new Error('Unknown param to getFee: ', param);
 }
+
+function getGtfo(param, buySell){
+	buySell = buySell || param.buySell;
+	if( ! buySell ){ throw new Error('no buySell in getGtfo'); }
+
+	var raw; 
+
+	if(_.isNumber(param)){
+		raw = param;
+	}
+	else if(_.isString(param)){
+		raw = trader.exchanges[param].arbitrageCutoff[buySell];
+	}
+	else if(_.isObject(param) && param.exchange){
+		raw = trader.exchanges[param.exchange].arbitrageCutoff[buySell];
+	} else {
+		throw new Error('Unknown param to getFee: ', param);	
+	}
+	return (raw / 100) + 1;
+}
+
 /*
     Two functions to take into account fees.
 */
@@ -87,7 +108,7 @@ function equivComparatorDesc(a, b){
 	return (b.deFactoPrice - a.deFactoPrice);
 }
 
-var currentCurrency, currentExchange, currentFee, currencyMultiplier, feeMultiplier, deFactoMultiplier;
+var currentCurrency, currentExchange, currentFee, currencyMultiplier, feeMultiplier, deFactoMultiplier, currentBuySell, currentGtfo;
 
 var lastReceivedExchange;
 
@@ -96,7 +117,9 @@ function objectifySpreadItem(item){
 		price : parseFloat(item[0]),
 		amount : parseFloat(item[1]),
 		exchange : currentExchange,
-		currency : currentCurrency, 
+		currency : currentCurrency,
+		buySell : currentBuySell,
+		gtfo : currentGtfo,
 		equivPrice :  parseFloat(item[0] * currencyMultiplier), 
 		deFactoPrice : parseFloat(item[0] * deFactoMultiplier)
 	};
@@ -123,12 +146,16 @@ function addToEquivIndex(spread){
 	// for buying
 	feeMultiplier = buying_cost(1, spread);
 	deFactoMultiplier = feeMultiplier * currencyMultiplier;
+	currentBuySell = 'buy';
+	currentGtfo = getGtfo(currentExchange, currentBuySell);
 
 	combinedSpreads.asks = _.first(merge(equivComparatorAsc, combinedSpreads.asks, _.map(spread.asks, objectifySpreadItem)), 20);
 
 	// for selling
 	feeMultiplier = selling_rev(1, spread);
 	deFactoMultiplier = feeMultiplier * currencyMultiplier;
+	currentBuySell = 'sell';
+	currentGtfo = getGtfo(currentExchange, currentBuySell);
 	combinedSpreads.bids = _.first(merge(equivComparatorDesc, combinedSpreads.bids, _.map(spread.bids, objectifySpreadItem)), 20);
 
 
@@ -222,7 +249,7 @@ function bestTrade(buySell, neededAmount, theoretical){
     Either simulates or trades on two exchanges if arbitrage possibilities
     arise. This is where things like fees and balances are taken into account.
 */
-function spitArbitrage(gtfo, theoretical){
+function spitArbitrage(theoretical){
 	var arbitrades = [];
     var asks = _.cloneDeep(combinedSpreads.asks);
     var bids = _.cloneDeep(combinedSpreads.bids);
@@ -231,16 +258,24 @@ function spitArbitrage(gtfo, theoretical){
     var lowAsk = asks.shift();
     var highBid = bids.shift();
 
-    gtfo = gtfo || 1;
-
     var buyingAffordance, sellingAffordance, tradeAmount;
 
     console.log('best prices: 	buy ', 
     	lowAsk.exchange, lowAsk.price.toFixed(2), lowAsk.deFactoPrice.toFixed(2), lowAsk.amount.toFixed(3), '	sell ', highBid.exchange, highBid.price.toFixed(2), highBid.deFactoPrice.toFixed(2), highBid.amount.toFixed(3));
 
-    while ( lowAsk && highBid && lowAsk.deFactoPrice * gtfo < highBid.deFactoPrice ){
-		lowAsk.buySell = 'buy';
-		highBid.buySell = 'sell';
+    while ( lowAsk && highBid && lowAsk.deFactoPrice < highBid.deFactoPrice ){
+
+    	// cutoff for gtfo
+    	gtfo = _.max([lowAsk.gtfo, highBid.gtfo]);
+		if(lowAsk.deFactoPrice * gtfo >= highBid.deFactoPrice){
+			// within gtfo, shift one of the two
+			if( gtfo == lowAsk.gtfo ){
+				lowAsk = asks.shift();
+			} else {
+				highBid = bids.shift();
+			}
+			continue;
+		}
 
     	if( theoretical ) {
     		buyingAffordance = lowAsk.amount;
@@ -324,7 +359,7 @@ trader.init().then(function () {
 	trader.on('updated_spread_data', addToEquivIndex);
 
 	trader.on('updated_best_trade', function(){
-		var possibleArbitrages = spitArbitrage(1.005, false);
+		var possibleArbitrages = spitArbitrage(false);
 		if(possibleArbitrages.length > 0){
 			var combined = combineArbitrades(possibleArbitrages);
 
