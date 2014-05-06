@@ -5,7 +5,7 @@ var _  = require('lodash');
 
 // _.extend(fx, jf.readFileSync('rates.json'));
 
-
+var fs = require('fs');
 
 var EventEmitter = require("events").EventEmitter;
 var trader = new EventEmitter();
