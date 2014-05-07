@@ -11,7 +11,7 @@ module.exports = function(conf, trader){
     this.initialized = initDeferred.promise;
 
     this.client = new Client(this.key, this.secret);
-    ['orderbook', 'new_order', 'order_status' /*, 'wallet_balances'*/].forEach(function(command){
+    ['orderbook', 'new_order', 'order_status', 'cancel_order' /*, 'wallet_balances'*/].forEach(function(command){
         self.client[command] = Promise.promisify(self.client[command]);
     })
     this.spreadAdapter = function(indata){
@@ -64,6 +64,10 @@ module.exports = function(conf, trader){
 
         return deferred.promise;
     }
+    this.cancel = function(id){
+        return this.client.cancel_order(id);
+    };
+
     this.tradeCommand = function(options){
         console.log('executing bitfinex trade: ', options);
 
