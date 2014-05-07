@@ -71,11 +71,12 @@ module.exports = function(conf, trader){
     this.tradeCommand = function(options){
         console.log('executing bitfinex trade: ', options);
 
-        return this.client.new_order('btcusd', options.volume, options.price, 'all', options.buySell.toLowerCase(), 'limit').then(function(response){
+        return this.client.new_order('btcusd', options.volume.toString(), options.price.toString(), 'all', options.buySell.toLowerCase(), 'limit').then(function(response){
             console.log('add order sent: ', response);
             return response;
         });
-    }
+    };
+
     this.trade = function(options){
         var tradeResolver = Promise.defer();
 
