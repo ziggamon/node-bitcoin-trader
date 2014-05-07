@@ -72,7 +72,7 @@ module.exports = function(conf, trader){
         });
     }
 
-    this.trade = function(options){
+    this.trade = function(options, timeout){
         var tradeResolver = Promise.defer();
 
         var neededOptions = ['currency', 'buySell', 'price', 'volume'];
@@ -89,7 +89,7 @@ module.exports = function(conf, trader){
             function tradeChecker(){
                 if(tradeResolver.promise.isResolved()){ return ; } // quit the loop    
                 self.client.promiseApi('QueryOrders', {txid: id}).then(function(response){
-                    console.log(response);
+                    // console.log(response);
                     var result = response.result[id];
                     if(result.status == 'closed'){ 
                         tradeResolver.resolve(result);
@@ -103,6 +103,15 @@ module.exports = function(conf, trader){
                 });
             }
             Promise.delay(300).then(tradeChecker);
+            
+            if(options.timeout && _.isNumber(options.timeout)){
+                setTimeout(function(){
+                    self.cancel(id).then(function(){
+                        tradeResolver.reject('Trade timeout: ' + id);
+                    });
+                }, options.timeout);
+            }
+
         });
 
         return tradeResolver.promise;

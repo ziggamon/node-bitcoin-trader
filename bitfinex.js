@@ -114,6 +114,17 @@ module.exports = function(conf, trader){
                 }
             }
             tradeChecker(response); // verify original response
+
+
+            if(options.timeout && _.isNumber(options.timeout)){
+                setTimeout(function(){
+                    self.cancel(id).then(function(){
+                        tradeResolver.reject('Trade timeout: ' + id);
+                    });
+                }, options.timeout);
+            }
+
+
         });
 
         return tradeResolver.promise;

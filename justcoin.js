@@ -83,6 +83,7 @@ module.exports = function(conf, trader){
         };
 
         this.doTrade(options).then(function(result){
+            console.log('justcoin trade sent: ', result);
             var id = result.id;
 
             var i = 0;
@@ -107,6 +108,15 @@ module.exports = function(conf, trader){
                 });
             }
             Promise.delay(300).then(tradeChecker);
+
+            if(options.timeout && _.isNumber(options.timeout)){
+                setTimeout(function(){
+                    self.cancel(id).then(function(){
+                        tradeResolver.reject('Trade timeout: ' + id);
+                    });
+                }, options.timeout);
+            }
+
         });
 
         return tradeResolver.promise;        
