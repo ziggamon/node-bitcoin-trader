@@ -112,7 +112,7 @@ trader.extractBuySell = function(spread){
 
 function logifyTrade(tradeOptions){
     tradeOptions.datetime = (new Date()).toString();
-    return _.template('${ datetime }: ${ buySell } @ ${ exchange }, ${ volume } at ${ price }', tradeOptions);
+    return _.template('${ datetime }: ${ buySell } @ ${ exchange }, ${ volume } at ${ price } \n', tradeOptions);
 }
 
 /*
