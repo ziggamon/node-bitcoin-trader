@@ -52,8 +52,8 @@ module.exports = function(conf, trader){
             }
 
             self.balance = {
-                'USD' : parseFloat(_.find(data, {type: 'exchange', currency :'usd'}).available),
-                'BTC' : parseFloat(_.find(data, {type: 'exchange', currency :'btc'}).available)
+                'USD' : Math.floor( parseFloat(_.find(data, {type: 'exchange', currency :'usd'}).available) * 1000) / 1000,
+                'BTC' : Math.floor( parseFloat(_.find(data, {type: 'exchange', currency :'btc'}).available) * 1000) / 1000
             };
             console.log('bitfinex.balance: ', self.balance);
             if(_.isNaN(self.balance.USD) || _.isNaN(self.balance.BTC)){
