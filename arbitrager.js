@@ -268,6 +268,7 @@ function spitArbitrage(theoretical){
     	// cutoff for gtfo
     	gtfo = _.max([lowAsk.gtfo, highBid.gtfo]);
 		if(lowAsk.deFactoPrice * gtfo >= highBid.deFactoPrice){
+			console.log('not doing trade because of cutoff point, ', gtfo);
 			// within gtfo, shift one of the two
 			if( gtfo == lowAsk.gtfo ){
 				lowAsk = asks.shift();
@@ -343,9 +344,14 @@ function combineArbitrades(arbitrades){
 }
 
 function performArbitrageTrades(trades){
+	_.each(trades, function(trade){
+		trade.timeout = 5000;
+	});
+
 	var firstCriticalTrade = trades.shift();
 
 	trader.trade(firstCriticalTrade).then(function(){
+		console.log('did first trade, now doing rest');
 		return Promise.map(trades, trader.trade); // do the other trades
 	}).then(function(){
 		console.log('trades done!');
@@ -364,7 +370,7 @@ trader.init().then(function () {
 			var combined = combineArbitrades(possibleArbitrages);
 
 			performArbitrageTrades(combined);
-
+/*
 			var buys = _.remove(combined, {buySell:'buy'})
 			var totalBuys = _.reduce(buys, function(sum, item){
 				return sum + (item.deFactoPrice * item.amount)
@@ -376,6 +382,7 @@ trader.init().then(function () {
 
 			console.log('Buy for ', totalBuys.toFixed(2), ' sell for ', totalSells.toFixed(2), ' profit: ', (totalSells-totalBuys).toFixed(2), ' percent: ', (100*(totalSells-totalBuys) / totalSells).toFixed(2), '%');
 			fs.appendFile('./log.txt', (new Date()).toTimeString() + ' Buy @ ' + buys[0].exchange + ' for ' + totalBuys.toFixed(2) + ' sell @ ' + combined[0].exchange +  ' for ' + totalSells.toFixed(2) + ' profit: ' + (totalSells-totalBuys).toFixed(2) + ' percent: ' + (100*(totalSells-totalBuys) / totalSells).toFixed(2) + '% \n');
+*/
 		}
 
 	});
