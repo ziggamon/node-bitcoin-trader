@@ -13,6 +13,7 @@ var baseCurrency = 'USD';
 
 function getRates(){
 	return request('http://openexchangerates.org/api/latest.json?app_id=' + config.rates.app_id, {json:true}).spread(function(request, data){
+		console.log('got new currency rates!');
 		_.extend(fx, data);
 	});
 }
