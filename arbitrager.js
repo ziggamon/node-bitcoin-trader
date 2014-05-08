@@ -162,11 +162,11 @@ function addToEquivIndex(spread){
 
 
 	if( !_.isEqual(bestAsk, combinedSpreads.asks[0]) ){
-		console.log('emitting updated best ask!')
+		console.log('new best Ask!', spread.exchange);
 		bestAsk = _.cloneDeep(combinedSpreads.asks[0]);
 		trader.emit('updated_best_trade');
 	} else if( !_.isEqual(bestBid, combinedSpreads.bids[0]) ){
-		console.log('emitting updated best bid');
+		console.log('new best Bid!', spread.exchange);
 		bestBid = _.cloneDeep(combinedSpreads.bids[0]);
 		trader.emit('updated_best_trade');
 	}
