@@ -103,7 +103,7 @@ module.exports = function(conf, trader){
                 });
             }
             Promise.delay(300).then(tradeChecker);
-            
+
             if(options.timeout && _.isNumber(options.timeout)){
                 setTimeout(function(){
                     self.cancel(id).then(function(){
@@ -129,11 +129,11 @@ module.exports = function(conf, trader){
             trader.emit('spread_data', data);
             return data;
         }).catch(Error, function(e){
-            console.error('kraken error .catch() ');
+            console.error('kraken error .catch() ', e);
         }).error(function(e){
-            console.error('kraken error .error() ');
+            console.error('kraken error .error() ', e);
         }).catch(function(e){
-            console.error('kraken general purpose catch()');
+            console.error('kraken general purpose catch()', e);
         });
     };
 
