@@ -131,7 +131,7 @@ function objectifySpreadItem(item){
 */
 function addToEquivIndex(spread){
 	lastReceivedExchange = spread.exchange;
-	console.log('updated spread data 	', spread.exchange);
+	// console.log('updated spread data 	', spread.exchange); // commenting out
 
 	// clear out previous data for this exchange/currency combo, we'll add new ones now!
 	_.remove(combinedSpreads.asks, {exchange:spread.exchange, currency: spread.currency});
