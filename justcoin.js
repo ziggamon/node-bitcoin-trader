@@ -45,6 +45,10 @@ module.exports = function(conf, trader){
         _.each(self.currencies, function(currency){
             balance[currency] = parseFloat(_.find(data, {currency: currency}).available)
         });
+
+        // hard coding for now a fix so that justcoin balance in BTC _includes_ fees.
+        balance['BTC'] *= (1-self.fee);
+
         return balance;
     };
 
