@@ -88,6 +88,16 @@ module.exports = function(conf, trader){
 
         this.doTrade(options).then(function(result){
             console.log('justcoin trade sent: ', result);
+
+            if(result.message){
+                tradeResolver.reject('justcoin trade error: ' + result.message);
+                return false;
+            }
+            if(!result.id){
+                tradeResolver.reject('justcoin unknown trade error: ' + result);
+                return false;
+            }
+            
             var id = result.id;
 
             var i = 0;
