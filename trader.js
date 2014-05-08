@@ -127,9 +127,11 @@ trader.trade = function(options){
     }).error(function(error){
         console.log('trade aborted: ', error);
         fs.appendFile('./closed_trades.txt', '-- ' +error + " " + logifyTrade(options));
+        throw error;
     }).catch(function(error){
         console.log('error in trade: ', error);
         fs.appendFile('./closed_trades.txt', '!! ' +error + " " + logifyTrade(options));
+        throw error;
     });
 }
 
