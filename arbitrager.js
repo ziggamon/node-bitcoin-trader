@@ -343,6 +343,8 @@ function combineArbitrades(arbitrades){
     return processedArbitrades;
 }
 
+var tradingInProgress = false;
+
 function performArbitrageTrades(trades){
 	_.each(trades, function(trade){
 		trade.timeout = 5000;
@@ -353,23 +355,37 @@ function performArbitrageTrades(trades){
 	trader.trade(firstCriticalTrade).then(function(){
 		console.log('did first trade, now doing rest');
 		return Promise.map(trades, trader.trade); // do the other trades
-	}).then(function(){
+	}).catch(function(e){
+		// catchall, something went wrong.
+		console.log('trades aborted, ', e);
+	}).done(function(){
 		console.log('trades done!');
 		return trader.getBalances();
-	}).then(function(){
+	}).finally(function(){
+		tradingInProgress = false;
 		console.log('Got new balances: ', getBalances());
-	}).done();
+	});
 }
 
 trader.init().then(function () {
 	trader.on('updated_spread_data', addToEquivIndex);
 
 	trader.on('updated_best_trade', function(){
+		if(tradingInProgress){
+			console.log('trading in progress, so not doing arbitrage');
+			return;
+		}
+		// console.log('buy: ', bestTrade('buy', 1));
+		// console.log('sell: ', bestTrade('sell', 1));
+
 		var possibleArbitrages = spitArbitrage(false);
 		if(possibleArbitrages.length > 0){
 			var combined = combineArbitrades(possibleArbitrages);
-
+			tradingInProgress = true;
 			performArbitrageTrades(combined);
+
+
+
 /*
 			var buys = _.remove(combined, {buySell:'buy'})
 			var totalBuys = _.reduce(buys, function(sum, item){
