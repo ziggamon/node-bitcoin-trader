@@ -224,7 +224,6 @@ function theoreticalTradeAmount(nextTrade, neededAmount){
 	Either practically (takes into account balances) or theoretically.
 */
 function bestTrade(buySell, neededAmount, theoretical){
-	throw new Error('bestTrade is currently now working')
 	var availableTrades = _.cloneDeep( (buySell.toLowerCase() === 'buy') ? combinedSpreads.asks : combinedSpreads.bids );
 	var tradeAmount, nextTrade;
 	var outputTrades = [], possibleAmounts = [];
