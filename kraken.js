@@ -106,9 +106,11 @@ module.exports = function(conf, trader){
 
             if(options.timeout && _.isNumber(options.timeout)){
                 setTimeout(function(){
-                    self.cancel(id).then(function(){
-                        tradeResolver.reject('Trade timeout: ' + id);
-                    });
+                    if( ! tradeResolver.promise.isResolved()) {
+                        self.cancel(id).then(function(){
+                            tradeResolver.reject('Trade timeout: ' + id);
+                        });
+                    }
                 }, options.timeout);
             }
 
