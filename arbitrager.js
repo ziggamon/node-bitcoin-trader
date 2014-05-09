@@ -355,12 +355,12 @@ function performArbitrageTrades(trades){
 	trader.trade(firstCriticalTrade).then(function(){
 		console.log('did first trade, now doing rest');
 		return Promise.map(trades, trader.trade); // do the other trades
+	}).then(function(){
+		console.log('trades done!');
+		return trader.getBalances();
 	}).catch(function(e){
 		// catchall, something went wrong.
 		console.log('trades aborted, ', e);
-	}).done(function(){
-		console.log('trades done!');
-		return trader.getBalances();
 	}).finally(function(){
 		tradingInProgress = false;
 		console.log('Got new balances: ', getBalances());
