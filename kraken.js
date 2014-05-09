@@ -131,11 +131,11 @@ module.exports = function(conf, trader){
             trader.emit('spread_data', data);
             return data;
         }).catch(Error, function(e){
-            console.error('kraken error .catch() ', e);
+            console.error(e.name, e.message, 'kraken error .catch()');
         }).error(function(e){
-            console.error('kraken error .error() ', e);
+            console.error('kraken error .error()', (_.isObject(e) ? _.keys(e) : e ));
         }).catch(function(e){
-            console.error('kraken general purpose catch()', e);
+            console.error('kraken general purpose catch()', (_.isObject(e) ? _.keys(e) : e ));
         });
     };
 
