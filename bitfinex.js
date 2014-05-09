@@ -50,7 +50,6 @@ module.exports = function(conf, trader){
                 console.error(error);
                 return deferred.reject(error);
             }
-
             self.balance = {
                 'USD' : Math.floor( parseFloat(_.find(data, {type: 'exchange', currency :'usd'}).available) * 1000) / 1000,
                 'BTC' : Math.floor( parseFloat(_.find(data, {type: 'exchange', currency :'btc'}).available) * 1000) / 1000
@@ -71,7 +70,7 @@ module.exports = function(conf, trader){
     this.tradeCommand = function(options){
         console.log('executing bitfinex trade: ', options);
 
-        return this.client.new_order('btcusd', options.volume.toString(), options.price.toString(), 'all', options.buySell.toLowerCase(), 'limit').then(function(response){
+        return this.client.new_order('btcusd', options.volume.toString(), options.price.toString(), 'all', options.buySell.toLowerCase(), 'exchange limit').then(function(response){
             console.log('add order sent: ', response);
             return response;
         });
@@ -96,7 +95,9 @@ module.exports = function(conf, trader){
             function tradeChecker(response){
                 if(tradeResolver.promise.isResolved()){ return ; } // quit the loop 
 
-                if(response.remaining_amount == 0){
+                console.log('tradecheck bitfinex: ', response);
+
+                if(response.original_amount == response.executed_amount ){
                     console.log('order is completed!');
                     tradeResolver.resolve(response);
                     return true;
