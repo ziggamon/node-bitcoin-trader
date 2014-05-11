@@ -194,7 +194,7 @@ function getBalances(){
 
 // much spaghetti in here... :/
 function affordedTradeAmount(buySell, nextTrade, neededAmount){
-
+	// TODO: Pass this into individual exchanges...
 	var maxAffordedAmount;
 	// TODO: only taking fees in account when buying, not when selling (fees normally charged in fiat). Is that right?
 	if(buySell.toLowerCase() === 'buy'){
@@ -207,11 +207,14 @@ function affordedTradeAmount(buySell, nextTrade, neededAmount){
 		throw "Something went wrong with calculating maxAffordedAmount" + JSON.stringify(nextTrade);
 	}
 
+	if(maxAffordedAmount < 0.01){
+		return 0;
+	}
+
 	var comparedAmounts = [maxAffordedAmount, nextTrade.amount];
 	if(neededAmount){ // sometimes I just want to get whatever
 		comparedAmounts.push(neededAmount);
 	}
-
 	return _.min(comparedAmounts);
 }
 
