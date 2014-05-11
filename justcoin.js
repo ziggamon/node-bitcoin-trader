@@ -133,6 +133,9 @@ module.exports = function(conf, trader){
                 }, options.timeout);
             }
 
+        }).catch(function(e){
+            console.log('Error in nested kraken trade: ', e);
+            tradeResolver.reject(e);
         });
 
         return tradeResolver.promise;        
