@@ -124,10 +124,10 @@ trader.trade = function(options){
     return trader.exchanges[options.exchange].trade(options).then(function(){
         console.log('trade closed! ', logifyTrade(options))
         fs.appendFile('./closed_trades.txt', logifyTrade(options));
-    }).error(function(error){
-        console.log('trade aborted: ', error);
-        fs.appendFile('./closed_trades.txt', '-- ' +error + " " + logifyTrade(options));
-        throw error;
+    // }).error(function(error){ // TODO: Specify error type here.
+    //     console.log('trade aborted: ', error);
+    //     fs.appendFile('./closed_trades.txt', '-- ' +error + " " + logifyTrade(options));
+    //     throw error;
     }).catch(function(error){
         console.log('error in trade: ', error);
         fs.appendFile('./closed_trades.txt', '!! ' +error + " " + logifyTrade(options));

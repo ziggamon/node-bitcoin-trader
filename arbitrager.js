@@ -363,7 +363,7 @@ function performArbitrageTrades(trades){
 		console.log('trades aborted, ', e);
 	}).finally(function(){
 		tradingInProgress = false;
-		console.log('Got new balances: ', getBalances());
+        console.log('Stopped trading, setting tradingInProgress to false');
 	});
 }
 
