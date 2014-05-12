@@ -9,6 +9,8 @@ module.exports = function(conf, trader){
     var initDeferred = Promise.defer();
     this.initialized = initDeferred.promise;
 
+    this.pollingInterval = 500;
+
     this._url = function(path){
         return 'https://justcoin.com/api/v1/' + path +'?key=' + self.key;
     };
@@ -53,12 +55,12 @@ module.exports = function(conf, trader){
     };
 
 
-    this.doTrade = function(options){
+    self.tradeCommand = function(options){
         var typeMapper = {
             'buy'  : 'bid',
             'sell' : 'ask'
         };
-        return this._doRequest('orders', 'POST', {
+        return self._doRequest('orders', 'POST', {
             market : 'BTC'+options.currency,
             type : typeMapper[options.buySell],
             amount : options.volume.toString(),
@@ -66,88 +68,115 @@ module.exports = function(conf, trader){
         });
     };
 
-    this.getOrders = function(){
-        return this._doRequest('orders');
+    self.getOrders = function(){
+        return self._doRequest('orders');
     };
-    this.getOrderHistory = function(){
-        return this._doRequest('orders/history');
+    self.getOrderHistory = function(){
+        return self._doRequest('orders/history');
     };
-    this.cancel = function(id){
-        return this._doRequest('orders/'+id, 'DELETE');
+    self.cancel = function(id){
+        return self._doRequest('orders/'+id, 'DELETE');
     };
 
-    this.trade = function(options){
-        var tradeResolver = Promise.defer();
+    self.idExtractor = function(response){
+        if(response.message){
+            throw new Error('justcoin trade error: ' + result.message);
+        }
+        if( ! response.id){
+            throw new Error('justcoin unknown trade error: ' + result);
+        }
 
-        var neededOptions = ['currency', 'buySell', 'price', 'volume'];
-        for (var i = neededOptions.length - 1; i >= 0; i--) {
-            if(!_.has(options, neededOptions[i])){
-                return tradeResolver.throw('Input data error').promise;
-            }
-        };
+        console.log('justcoin order id: ', response.id);
+        this.id = response.id;
+        this.retries = 0;
+        return response;
+    };
 
-        this.doTrade(options).then(function(result){
-            console.log('justcoin trade sent: ', result);
-
-            if(result.message){
-                tradeResolver.reject('justcoin trade error: ' + result.message);
-                return false;
-            }
-            if(!result.id){
-                tradeResolver.reject('justcoin unknown trade error: ' + result);
-                return false;
-            }
-            
-            var id = result.id;
-
-            var i = 0;
-            function tradeChecker(){
-                if(tradeResolver.promise.isResolved()){ return ; } // quit the loop    
-                self.getOrders().then(function(orders){
-                    var myOrder = _.find(orders, {id:id});
-
-                    if(!myOrder){
-                        self.getOrderHistory().then(function(orders){
-                            var myOrder = _.find(orders, {id:id});
-                            if(!myOrder){// not in history, rejecting
-                                tradeResolver.reject('order ' + id + ' cancelled');
-                            } else {
-                                tradeResolver.resolve(myOrder);
-                            }
-                        });
-                        return;
-                    }
-                    console.log('order ', id, 'is ', myOrder, 'iteration', i++);
-                    Promise.delay(500).then(tradeChecker); // keep looping this baby
-                });
-            }
-            Promise.delay(300).then(tradeChecker);
-
-            if(options.timeout && _.isNumber(options.timeout)){
-                setTimeout(function(){
-                    if( ! tradeResolver.promise.isResolved()) {
-                        self.cancel(id).then(function(){
-                            tradeResolver.reject('Trade timeout: ' + id);
-                        });
-                    }
-                }, options.timeout);
-            }
-
-        }).catch(function(e){
-            console.log('Error in nested kraken trade: ', e);
-            tradeResolver.reject(e);
-        });
-
-        return tradeResolver.promise;        
+    self.tradeChecker = function(){
+        console.log('tradecheck justcoin: ', this.id);
+        return self.getOrders()
+            .bind(this)
+            .then(self.responseProcessor)
+            .then(self.tradeCheckLooper);
     }
 
+    self.responseProcessor = function(response){
+        var myOrder = _.find(response, {id:this.id});
+
+        if( ! myOrder){ // order is not remaining, either complete or rejected
+            return self.getOrderHistory().bind(this).then(function(orders){
+                var myOrder = _.find(orders, {id:this.id});
+                if(!myOrder){// not in history, rejecting
+                    throw new Error('order ' + this.id + ' cancelled');
+                } else {
+                    return {
+                        success : true,
+                        response: myOrder
+                    }
+                }
+            });
+        } else {
+            return false;
+        }
+    };
+
+    
+    // these can be generalized, broken out
+
+    self.tradeValidator = function(options){
+        return new Promise(function(resolve, reject){
+            var neededOptions = ['currency', 'buySell', 'price', 'volume'];
+            for (var i = neededOptions.length - 1; i >= 0; i--) {
+                if(!_.has(options, neededOptions[i])){
+                    reject("Trade doesn't have needed properties; 'currency', 'buySell', 'price', 'volume'");
+                    return;
+                }
+            }
+            resolve(options);
+        });
+    };
+
+    self.tradeCheckLooper = function(finishedResponse){
+        if(finishedResponse){
+            return finishedResponse;
+        }
+
+        console.log('order ', this.id, 'is still running, iteration', this.retries++);
+
+        // keep looping this baby
+        if(this.retries <= 1){
+            return Promise.bind(this).then(self.tradeChecker); // first retry do immediately
+        } else {
+            return Promise.delay(self.pollingInterval).bind(this).then(self.tradeChecker);
+        }
+    };
+
+    self.trade = function(options){
+        return self.tradeValidator(options)
+            .then(self.tradeCommand)
+            .bind({}) // create a shared this property
+            .then(self.idExtractor)
+            .then(function(response){
+                if(options.timeout && _.isNumber(options.timeout)){
+                    return Promise.bind(this).then(self.tradeChecker).timeout(options.timeout);
+
+                } else {
+                    return Promise.bind(this).then(self.tradeChecker);
+                }
+            }).catch(Promise.TimeoutError, function(e){
+                console.log('Trade timeout, cancelling');
+                self.cancel(this.id);
+                throw e;
+            });
+    };
+
     this.getBalance = function(){
-        return this._doRequest('balances').then(function(data){
+        return self._doRequest('balances').then(function(data){
             self.balance = balanceMapper(data);
             return self.balance;
         })
     }
-    this.getBalance().then(function(data){
+    self.getBalance().then(function(data){
         console.log('justcoin balance: ', data);
         initDeferred.resolve();
         // id: 2361955
