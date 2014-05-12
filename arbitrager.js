@@ -203,7 +203,7 @@ function affordedTradeAmount(buySell, nextTrade, neededAmount){
 		maxAffordedAmount = balances[nextTrade.exchange]['BTC'];
 	}
 
-	if(_.isNaN(maxAffordedAmount)){
+	if(_.isNaN(maxAffordedAmount) || typeof maxAffordedAmount == 'undefined'){
 		throw "Something went wrong with calculating maxAffordedAmount" + JSON.stringify(nextTrade);
 	}
 
@@ -263,7 +263,7 @@ function spitArbitrage(theoretical){
 
     var buyingAffordance, sellingAffordance, tradeAmount;
 
-    console.log('best prices: 	buy ', 
+    console.log((new Date()).toISOString() + ' best prices: 	buy ', 
     	lowAsk.exchange, lowAsk.price.toFixed(2), lowAsk.deFactoPrice.toFixed(2), lowAsk.amount.toFixed(3), '	sell ', highBid.exchange, highBid.price.toFixed(2), highBid.deFactoPrice.toFixed(2), highBid.amount.toFixed(3));
 
     while ( lowAsk && highBid && lowAsk.deFactoPrice < highBid.deFactoPrice ){
