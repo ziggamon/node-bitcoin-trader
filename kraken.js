@@ -14,6 +14,7 @@ module.exports = function(conf, trader){
 
     this.client.promiseApi = Promise.promisify(this.client.api);
 
+    this.pollingInterval = 5000;
     // this.checkTrade = function(){ // not working
     //     console.log('checktrade kraken');
     //     var deferred = Promise.defer();
@@ -49,7 +50,7 @@ module.exports = function(conf, trader){
     }
 */
     this.cancel = function(id){
-        return this.client.promiseApi('CancelOrder', {txid: id});
+        return self.client.promiseApi('CancelOrder', {txid: id});
     };
 
     this.tradeCommand = function(options){
@@ -65,61 +66,96 @@ module.exports = function(conf, trader){
 
         console.log('executing kraken trade: ', orderOptions);
 
-        return this.client.promiseApi('AddOrder', orderOptions).then(function(response){
+        return self.client.promiseApi('AddOrder', orderOptions).then(function(response){
             var result = response.result;
             console.log('add order sent: ', result);
             return result;
         });
     }
 
-    this.trade = function(options, timeout){
-        var tradeResolver = Promise.defer();
 
-        var neededOptions = ['currency', 'buySell', 'price', 'volume'];
-        for (var i = neededOptions.length - 1; i >= 0; i--) {
-            if(!_.has(options, neededOptions[i])){
-                return tradeResolver.throw('Input data error').promise;
+    self.idExtractor = function(response){
+        console.log('kraken order id: ', response.txid[0]);
+        this.id = response.txid[0];
+        this.retries = 0;
+        return response;
+    };
+
+    self.tradeChecker = function(){
+        console.log('tradecheck kraken: ', this.id);
+        return self.client.promiseApi('QueryOrders', {txid: this.id})
+            .bind(this)
+            .then(self.responseProcessor)
+            .then(self.tradeCheckLooper);
+    }
+
+    // these can be generalized, broken out
+
+    this.tradeValidator = function(options){
+        return new Promise(function(resolve, reject){
+            var neededOptions = ['currency', 'buySell', 'price', 'volume'];
+            for (var i = neededOptions.length - 1; i >= 0; i--) {
+                if(!_.has(options, neededOptions[i])){
+                    reject("Trade doesn't have needed properties; 'currency', 'buySell', 'price', 'volume'");
+                    return;
+                }
             }
-        };
-
-        this.tradeCommand(options).then(function(result){
-            var ids = result.txid; // this is an array, a bit unclear why, perhaps it can handle multiple orders
-            var id = ids[0];
-            var i = 0;
-            function tradeChecker(){
-                if(tradeResolver.promise.isResolved()){ return ; } // quit the loop    
-                self.client.promiseApi('QueryOrders', {txid: id}).then(function(response){
-                    // console.log(response);
-                    var result = response.result[id];
-                    if(result.status == 'closed'){ 
-                        tradeResolver.resolve(result);
-                        return true;
-                    } else if(result.status == 'canceled' || result.status == 'expired'){ 
-                        tradeResolver.reject(result);
-                        return false;
-                    }
-                    console.log('order ', id, 'is ', result.status, 'iteration', i++);
-                    Promise.delay(5000).then(tradeChecker); // keep looping this baby
-                });
-            }
-            Promise.delay(300).then(tradeChecker);
-
-            if(options.timeout && _.isNumber(options.timeout)){
-                setTimeout(function(){
-                    if( ! tradeResolver.promise.isResolved()) {
-                        self.cancel(id).then(function(){
-                            tradeResolver.reject('Trade timeout: ' + id);
-                        });
-                    }
-                }, options.timeout);
-            }
-
-        }).catch(function(e){
-            console.log('Error in nested kraken trade: ', e);
-            tradeResolver.reject(e);
+            resolve(options);
         });
+    };
 
-        return tradeResolver.promise;
+    self.responseProcessor = function(response){
+        console.log('this.id: ', this.id);
+        console.log('resposne: ', response);
+        var result = response.result[this.id];
+        console.log(result);
+        if(result.status == 'closed'){ 
+            console.log('order is completed!');
+            return {
+                success : true,
+                response : response
+            };
+        } else if (result.status == 'open'){ 
+            return false; // test more
+        } else if(result.status == 'canceled' || result.status == 'expired'){ 
+            console.log('order is cancelled!');
+            throw new Error('order is cancelled!', response);
+        }
+        throw new Error('Unclear trade situation: ', response);
+    };
+
+    self.tradeCheckLooper = function(finishedResponse){
+        if(finishedResponse){
+            return finishedResponse;
+        }
+
+        console.log('order ', this.id, 'is still running, iteration', this.retries++);
+
+        // keep looping this baby
+        if(this.retries <= 1){
+            return Promise.bind(this).then(self.tradeChecker); // first retry do immediately
+        } else {
+            return Promise.delay(self.pollingInterval).bind(this).then(self.tradeChecker);
+        }
+    };
+
+    this.trade = function(options){
+        return self.tradeValidator(options)
+            .then(self.tradeCommand)
+            .bind({}) // create a shared this property
+            .then(self.idExtractor)
+            .then(function(response){
+                if(options.timeout && _.isNumber(options.timeout)){
+                    return Promise.bind(this).then(self.tradeChecker).timeout(options.timeout);
+
+                } else {
+                    return Promise.bind(this).then(self.tradeChecker);
+                }
+            }).catch(Promise.TimeoutError, function(e){
+                console.log('Trade timeout, cancelling');
+                self.cancel(this.id);
+                throw e;
+            });
     };
 
     this.getSpread = function(currency){
@@ -134,7 +170,7 @@ module.exports = function(conf, trader){
             trader.emit('spread_data', data);
             return data;
         }).catch(Error, function(e){
-            console.error(e.name, e.message, 'kraken error .catch()');
+            console.error('kraken error .catch()', e.name);
         }).error(function(e){
             console.error('kraken error .error()', (_.isObject(e) ? _.keys(e) : e ));
         }).catch(function(e){
