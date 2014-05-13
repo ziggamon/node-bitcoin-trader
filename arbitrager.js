@@ -349,6 +349,8 @@ function combineArbitrades(arbitrades){
 var tradingInProgress = false;
 
 function performArbitrageTrades(trades){
+	console.log('doing arbitrage trades: ', trades);
+	tradingInProgress = true;
 	_.each(trades, function(trade){
 		trade.timeout = 5000;
 	});
@@ -384,7 +386,6 @@ trader.init().then(function () {
 		var possibleArbitrages = spitArbitrage(false);
 		if(possibleArbitrages.length > 0){
 			var combined = combineArbitrades(possibleArbitrages);
-			tradingInProgress = true;
 			performArbitrageTrades(combined);
 
 

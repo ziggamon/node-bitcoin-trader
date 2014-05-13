@@ -171,8 +171,6 @@ module.exports = function(conf, trader){
             return data;
         }).catch(Error, function(e){
             console.error('kraken error .catch()', e.name);
-        }).error(function(e){
-            console.error('kraken error .error()', (_.isObject(e) ? _.keys(e) : e ));
         }).catch(function(e){
             console.error('kraken general purpose catch()', (_.isObject(e) ? _.keys(e) : e ));
         });

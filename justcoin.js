@@ -80,10 +80,10 @@ module.exports = function(conf, trader){
 
     self.idExtractor = function(response){
         if(response.message){
-            throw new Error('justcoin trade error: ' + result.message);
+            throw new Error('justcoin trade error: ' + response.message);
         }
         if( ! response.id){
-            throw new Error('justcoin unknown trade error: ' + result);
+            throw new Error('justcoin unknown trade error: ' + response);
         }
 
         console.log('justcoin order id: ', response.id);
