@@ -359,16 +359,25 @@ function performArbitrageTrades(trades){
 
 	trader.trade(firstCriticalTrade).then(function(){
 		console.log('did first trade, now doing rest');
-		return Promise.map(trades, trader.trade); // do the other trades
-	}).then(function(){
-		console.log('trades done!');
-		return trader.getBalances();
+
+		var allOthers = _.map(trades, function(tradeObject){
+			return trader.trade(tradeObject).catch(function(e){
+				console.log('caught error in trade: ', e);
+				throw e;
+			});
+		});
+
+		return Promise.settle(allOthers);
+//		return Promise.map(trades, trader.trade); // do the other trades
 	}).catch(function(e){
 		// catchall, something went wrong.
 		console.log('trades aborted, ', e);
 	}).finally(function(){
-		tradingInProgress = false;
-        console.log('Stopped trading, setting tradingInProgress to false');
+        console.log('Stopped trading, rechecking balances');
+		trader.getBalances().then(function(){
+        	console.log('setting tradingInProgress to false');
+			tradingInProgress = false;
+		})
 	});
 }
 
