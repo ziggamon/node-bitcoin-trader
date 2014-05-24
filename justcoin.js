@@ -36,6 +36,9 @@ module.exports = function(conf, trader){
         currency = currency || 'EUR';
         return this._doRequest('markets/BTC' + currency + '/depth').then(function(data){
             _.extend(data, {exchange: 'justcoin', currency: currency});
+            if(! data.exchange){
+                throw "Justcoin weird missing data error";
+            }
             trader.emit('spread_data', data);
             return data;
         });
