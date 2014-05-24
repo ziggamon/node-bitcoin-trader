@@ -333,9 +333,10 @@ function combineArbitrades(arbitrades){
 	// do this until break
 	do{
 		// filters out each trade that has the exact same buySell, deFactoPrice, exchange and currency.
-		combinations = _.remove( arbitrades, _.pick(item, ['buySell', 'deFactoPrice', 'exchange', 'currency']));
+		combinations = _.remove( arbitrades, _.pick(item, ['buySell', 'exchange', 'currency']));
 		_.each(combinations, function(comboItem){
-			item.amount += comboItem.amount;
+			comboItem.amount += item.amount;
+			item = comboItem;
 		});
 		processedArbitrades.push(item);
 
