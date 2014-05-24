@@ -158,6 +158,21 @@ module.exports = function(conf, trader){
             });
     };
 
+    function mergeTinies(spreadArray){
+        var carry = 0;
+        var returnArray = [];
+        _.each(spreadArray, function(spreadItem){
+            spreadItem[1] = parseFloat(spreadItem[1]) + carry;
+            carry = 0;
+            if(spreadItem[1] >= 0.01){
+                returnArray.push(spreadItem);
+            } else {
+                carry = spreadItem[1];
+            }
+        });
+        return returnArray;
+    }
+
     this.getSpread = function(currency){
         currency = currency || 'EUR';
         
@@ -167,6 +182,10 @@ module.exports = function(conf, trader){
         return self.client.promiseApi('Depth', {pair: market, count: 5}).then(function(data){
             var data = data.result[market];
             _.extend(data, {exchange: 'kraken', currency: currency});
+
+            // removing tiny transactions because they fool the bot
+            data.asks = mergeTinies(data.asks);
+            data.bids = mergeTinies(data.bids);
             trader.emit('spread_data', data);
             return data;
         }).catch(Error, function(e){
