@@ -171,7 +171,12 @@ trader.watch = function(currency){
 
 function checkForSpreadUpdates(spread){
     // console.log('trader got spread data for', spread.exchange);
-    spread.fee = trader.exchanges[spread.exchange].fee;
+    try {
+        spread.fee = trader.exchanges[spread.exchange].fee;
+    } catch(e){
+        console.log('checkForSpreadUpdates error: ', e, spread);
+        throw e;
+    }
     if(_.isEqual(spread, RawSpreads[spread.currency][spread.exchange])){
         // console.log('SPREADS ARE EQUAL!!');
         return;
@@ -182,118 +187,5 @@ function checkForSpreadUpdates(spread){
 }
 
 trader.on('spread_data', checkForSpreadUpdates);
-
-
-// EVERYTHING BELOW THIS LINE IS DEPRECATED
-
-/*
-from array of [a, b, c] 
-returns array of arrays 
-[ 
-    [a,b], 
-    [a,c], 
-    [b,c] 
-]
-*/
-function getPairs(singles){
-    var pairs = [];
-    do {
-        first = singles.shift();
-        for (var i = 0; i < singles.length; i++) {
-            pairs.push([first, singles[i]]);
-        };
-    } while (singles.length > 1);
-
-    return pairs;
-}
-
-/*
-from array of [a, b, c] 
-returns array of arrays 
-[ 
-    [a,b], 
-    [b,a], 
-    [a,c] 
-    ... etc ... 
-]
-*/
-function getPairsInBothOrders(singles){
-    var pairs = [];
-    do {
-        first = singles.shift();
-        for (var i = 0; i < singles.length; i++) {
-            pairs.push([first, singles[i]]);
-            pairs.push([singles[i], first]);
-        };
-    } while (singles.length > 1);
-
-    return pairs;
-}
-
-/*
-    Deprecated in favor of detectArbitrageFor(). 
-*/
-/*
-function detectArbitragePossibilities(spreads){
-    var arbitragePossibilities = [];
-    var spreadPairs = getPairsInBothOrders(spreads);
-
-    spreadPairs.forEach(function(pair){
-        if(arbitrage_possibilities(pair)){
-            arbitragePossibilities.push(pair);
-        }
-    });
-
-    if(arbitragePossibilities.length > 0){
-        arbitragePossibilities.forEach(processArbitrage);
-    } else {
-        console.log('no arbitrage');
-    }
-
-    return arbitragePossibilities;
-}
-*/
-
-
-/*
-  Deprecated. Find all arbitrage possibilities available at this moment.
-  Superceded by new structure with events, and to be removed soon.  
-*/
-/*
-trader.getArbitragePossibilities = function(currency){
-    currency = currency || 'USD' ;
-    trader.getAllSpreads(currency).then(function(results){
-        var arbitragePossibilities = detectArbitragePossibilities(results);
-    });
-}
-*/
-/*
-    Deprecated. 
-    Calculate de facto costs of buying / selling in a spread,
-    with regard to current fees (as loaded from API or pre-set in config)
-*/
-/*
-function adjust_to_fee(spread, fee){
-    var oldAsks = spread.asks;
-    var oldBids = spread.bids;
-    var newSpread = {};
-    newSpread.exchange = spread.exchange;
-    newSpread.currency = spread.currency;
-    newSpread.asks = [];
-    newSpread.bids = [];
-    oldAsks.forEach(function(row){
-        row[0] = (row[0] * (1+fee)).toFixed(4);
-        newSpread.asks.push(row);
-    });
-    oldBids.forEach(function(row){
-        row[0] = (row[0] * (1-fee)).toFixed(4);
-        newSpread.bids.push(row);
-    });
-    return newSpread;
-};
-
-*/
-
-
 
 module.exports = trader;
