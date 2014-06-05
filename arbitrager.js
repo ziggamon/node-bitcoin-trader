@@ -43,7 +43,7 @@ function getGtfo(param, buySell){
 	buySell = buySell || param.buySell;
 	if( ! buySell ){ throw new Error('no buySell in getGtfo'); }
 
-	var raw; 
+	var raw;
 
 	if(_.isNumber(param)){
 		raw = param;
@@ -54,7 +54,7 @@ function getGtfo(param, buySell){
 	else if(_.isObject(param) && param.exchange){
 		raw = trader.exchanges[param.exchange].arbitrageCutoff[buySell];
 	} else {
-		throw new Error('Unknown param to getFee: ', param);	
+		throw new Error('Unknown param to getFee: ', param);
 	}
 	return (raw / 100) + 1;
 }
@@ -66,7 +66,7 @@ function buying_cost(amount, feeParam){
     return amount * (1 + getFee(feeParam));
 }
 function selling_rev(amount, feeParam){
-    return amount * (1 - getFee(feeParam));   
+    return amount * (1 - getFee(feeParam));
 }
 
 var combinedSpreads = {
@@ -121,7 +121,7 @@ function objectifySpreadItem(item){
 		currency : currentCurrency,
 		buySell : currentBuySell,
 		gtfo : currentGtfo,
-		equivPrice :  parseFloat(item[0] * currencyMultiplier), 
+		equivPrice :  parseFloat(item[0] * currencyMultiplier),
 		deFactoPrice : parseFloat(item[0] * deFactoMultiplier)
 	};
 }
@@ -196,11 +196,11 @@ function getBalances(){
 function affordedTradeAmount(buySell, nextTrade, neededAmount){
 	// TODO: Pass this into individual exchanges...
 	var maxAffordedAmount;
-	// TODO: only taking fees in account when buying, not when selling (fees normally charged in fiat). Is that right?
+	// taking fees into account both at buy and sell. Just in case. This should really be passed into exchange file.
 	if(buySell.toLowerCase() === 'buy'){
 		maxAffordedAmount = balances[nextTrade.exchange][nextTrade.currency] / buying_cost(nextTrade.price,nextTrade);
 	} else { // sell
-		maxAffordedAmount = balances[nextTrade.exchange]['BTC'];
+		maxAffordedAmount = balances[nextTrade.exchange]['BTC'] * ( 1 - getFee(nextTrade) ); // conservative, always account for fee
 	}
 
 	if(_.isNaN(maxAffordedAmount) || typeof maxAffordedAmount == 'undefined'){
@@ -223,7 +223,7 @@ function theoreticalTradeAmount(nextTrade, neededAmount){
 }
 
 /*
-	Gives you the best trades to buy or sell neededAmount or BTC. 
+	Gives you the best trades to buy or sell neededAmount or BTC.
 	Either practically (takes into account balances) or theoretically.
 */
 function bestTrade(buySell, neededAmount, theoretical){
@@ -263,7 +263,7 @@ function spitArbitrage(theoretical){
 
     var buyingAffordance, sellingAffordance, tradeAmount;
 
-    console.log((new Date()).toISOString() + ' best prices: 	buy ', 
+    console.log((new Date()).toISOString() + ' best prices: 	buy ',
     	lowAsk.exchange, lowAsk.price.toFixed(2), lowAsk.deFactoPrice.toFixed(2), lowAsk.amount.toFixed(3), '	sell ', highBid.exchange, highBid.price.toFixed(2), highBid.deFactoPrice.toFixed(2), highBid.amount.toFixed(3));
 
     while ( lowAsk && highBid && lowAsk.deFactoPrice < highBid.deFactoPrice ){
@@ -323,7 +323,7 @@ function combineArbitrades(arbitrades){
 	console.log('precombines arbitrades: ', arbitrades);
 	var processedArbitrades = [], combinations = [];
 
-	// first, find the item that came from the lastReceivedExchange. 
+	// first, find the item that came from the lastReceivedExchange.
 	var item = _.find(arbitrades, {exchange : lastReceivedExchange});
 	if(!item){
 		throw new Error('Shouldnt happen; Couldnt find an item from the last received exchange: ', lastReceivedExchange);
