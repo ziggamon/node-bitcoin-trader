@@ -11,14 +11,15 @@
   "dependencies": {
     "node-terminal-notifier": "~0.1.0",
     "bitstamp": "~0.1.5",
-    "bluebird": "~1.2.2",
+    "bluebird": "~1.2.4",
     "kraken-api": "~0.1.4",
     "lodash": "~2.4.1",
     "money": "~0.1.3",
     "microtime": "~0.5.1",
     "jsonfile": "~1.1.1",
     "bitfinex": "git://github.com/naddison36/bitfinex.git",
-    "request": "~2.34.0",
-    "pusher-client": "~0.2.1"
+    "request": "~2.36.0",
+    "pusher-client": "~0.2.1",
+    "numeral": "~1.5.3"
   }
 }
