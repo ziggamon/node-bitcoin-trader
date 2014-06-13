@@ -4,17 +4,26 @@ module.exports = {
         'kraken' : {
             enabled: false,
             fee : 0.2 / 100, // best case: 0.05, worst case: 0.3 (USD), 0.2 (EUR)
-            key : '', 
+            key : '',
             secret: '',
-            currencies : ['BTC', 'EUR', 'USD']
+            currencies : ['BTC', 'EUR', 'USD'],
+            arbitrageCutoff : {
+                buy : 0.7,
+                sell : 0
+            }
         },
         'bitstamp' : {
             enabled: false,
             fee : 0.5 / 100, // best case: 0.2, worst case: 0.5. Bitstamp fee will auto update
-            key : '', 
-            secret: '', 
+            key : '',
+            secret: '',
             customer_id: '',
-            currencies : ['BTC', 'USD']
+            currencies : ['BTC', 'USD'],
+            arbitrageCutoff : {
+                buy : 0,
+                sell : 0.4
+            }
+
         },
         'justcoin' : {
             enabled: false,
@@ -29,9 +38,14 @@ module.exports = {
                 'USD' : 0.0,
             },
             fee : 0.15 / 100, // best case: 0.1
-            key:'', 
+            key:'',
             secret: '',
-            currencies : ['BTC', 'USD']
+            currencies : ['BTC', 'USD'],
+            arbitrageCutoff : {
+                buy : 0.3,
+                sell : 0
+            }
+
         }
     },
     rates : {
